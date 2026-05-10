@@ -1,0 +1,1493 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>下課狀態看板</title>
+  <style>
+    :root {
+      --paper: #fffaf1;
+      --ink: #24312c;
+      --muted: #66736d;
+      --line: #ddcfba;
+      --ok: #2f8062;
+      --ok-bg: #dff1e5;
+      --calm: #b84e43;
+      --calm-bg: #f7ded8;
+      --gold: #bf7f2f;
+      --warn: #a65f1a;
+      --warn-bg: #fff2d6;
+      --error: #9a3d35;
+      --error-bg: #ffe5df;
+      --shadow: 0 14px 34px rgba(72, 56, 34, .14);
+      font-family: "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 16% 10%, rgba(255, 255, 255, .72), transparent 28%),
+        linear-gradient(135deg, #f4eadb 0%, #eef3e7 54%, #f8efe2 100%);
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button { border: 0; cursor: pointer; }
+
+    .app {
+      height: 100vh;
+      padding: clamp(10px, 1.2vw, 20px);
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: clamp(8px, 1vw, 14px);
+    }
+
+    header {
+      min-height: 72px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto auto;
+      align-items: center;
+      gap: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 3.1vw, 56px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: clamp(15px, 1.15vw, 22px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .summary {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .main-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      min-width: 118px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: rgba(255, 250, 241, .78);
+      border: 1px solid rgba(120, 95, 61, .16);
+      box-shadow: 0 8px 20px rgba(72, 56, 34, .08);
+      text-align: center;
+    }
+
+    .pill strong {
+      display: block;
+      font-size: clamp(22px, 2.4vw, 38px);
+      line-height: 1;
+    }
+
+    .pill span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: clamp(13px, 1vw, 17px);
+    }
+
+    .icon-btn {
+      width: 54px;
+      height: 54px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: #fff9ee;
+      color: var(--ink);
+      border: 1px solid rgba(120, 95, 61, .18);
+      box-shadow: 0 8px 18px rgba(72, 56, 34, .11);
+    }
+
+    .icon-btn svg {
+      width: 27px;
+      height: 27px;
+      stroke-width: 2.2;
+    }
+
+    .main-action-btn {
+      min-height: 44px;
+      border-radius: 8px;
+      padding: 9px 13px;
+      background: #fff9ee;
+      color: var(--ink);
+      border: 1px solid rgba(120, 95, 61, .2);
+      box-shadow: 0 8px 18px rgba(72, 56, 34, .1);
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .main-action-btn.calm-all {
+      background: #f6e0da;
+      color: #8d3e36;
+      border-color: #dfb4aa;
+    }
+
+    .message {
+      display: none;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: clamp(15px, 1.05vw, 19px);
+      font-weight: 800;
+      line-height: 1.35;
+      border: 1px solid transparent;
+    }
+
+    .message.show { display: block; }
+    .message.warn { color: var(--warn); background: var(--warn-bg); border-color: #e7c284; }
+    .message.error { color: var(--error); background: var(--error-bg); border-color: #dfaaa0; }
+    .message.ok { color: var(--ok); background: #e5f4e8; border-color: #aad1b8; }
+
+    main {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(210px, 20vw);
+      gap: clamp(10px, 1.1vw, 16px);
+    }
+
+    .board {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: repeat(var(--board-cols, 5), minmax(0, 1fr));
+      grid-auto-rows: minmax(0, 1fr);
+      gap: clamp(9px, .85vw, 14px);
+      position: relative;
+    }
+
+    .student {
+      min-width: 0;
+      min-height: 0;
+      border-radius: 8px;
+      padding: clamp(9px, .75vw, 13px);
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      align-items: stretch;
+      gap: clamp(7px, .65vw, 10px);
+      border: 2px solid rgba(70, 105, 82, .22);
+      background: linear-gradient(160deg, #fbfff7, var(--ok-bg));
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .student.calm {
+      border-color: rgba(184, 78, 67, .35);
+      background: linear-gradient(160deg, #fff7f4, var(--calm-bg));
+    }
+
+    .student.manual::after {
+      content: "手動";
+      position: absolute;
+      right: 8px;
+      top: 8px;
+      padding: 3px 6px;
+      border-radius: 6px;
+      background: rgba(255, 250, 241, .92);
+      color: #8a683a;
+      font-size: clamp(11px, .8vw, 13px);
+      border: 1px solid rgba(138, 104, 58, .2);
+    }
+
+    .student-toggle {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: clamp(6px, .62vw, 9px);
+      padding: 0;
+      background: transparent;
+      color: inherit;
+    }
+
+    .student-name {
+      min-width: 0;
+      max-width: 100%;
+      align-self: center;
+      text-align: center;
+      font-size: clamp(17px, 1.7vw, 32px);
+      font-weight: 900;
+      line-height: 1.14;
+      overflow-wrap: break-word;
+      word-break: keep-all;
+      overflow: hidden;
+    }
+
+    .student-name.long-name { font-size: clamp(15px, 1.35vw, 25px); }
+    .student-name.extra-long-name { font-size: clamp(13px, 1.05vw, 20px); line-height: 1.2; }
+
+    .status {
+      padding: clamp(6px, .72vw, 10px);
+      border-radius: 8px;
+      background: var(--ok);
+      color: white;
+      font-size: clamp(15px, 1.12vw, 22px);
+      font-weight: 900;
+      line-height: 1.08;
+      text-align: center;
+    }
+
+    .calm .status { background: var(--calm); }
+
+    .work-btn {
+      justify-self: end;
+      min-height: 30px;
+      max-width: 100%;
+      padding: 5px 10px;
+      border-radius: 8px;
+      background: rgba(255, 250, 241, .9);
+      color: #6d4d2d;
+      border: 1px solid rgba(138, 104, 58, .24);
+      font-size: clamp(12px, .86vw, 15px);
+      font-weight: 900;
+      box-shadow: 0 4px 10px rgba(72, 56, 34, .08);
+    }
+
+    .side {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: clamp(10px, 1vw, 14px);
+    }
+
+    .clock, .notice-box {
+      border-radius: 8px;
+      background: rgba(255, 250, 241, .84);
+      border: 1px solid rgba(120, 95, 61, .18);
+      box-shadow: var(--shadow);
+    }
+
+    .clock {
+      padding: clamp(12px, 1.25vw, 18px);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .clock strong {
+      font-size: clamp(28px, 3vw, 52px);
+      line-height: 1;
+    }
+
+    .clock span {
+      color: var(--muted);
+      font-size: clamp(14px, 1.05vw, 19px);
+      text-align: right;
+    }
+
+    .period-now {
+      grid-column: 1 / -1;
+      padding-top: 8px;
+      border-top: 1px solid rgba(120, 95, 61, .16);
+      color: #6f5631;
+      font-size: clamp(18px, 1.45vw, 27px);
+      font-weight: 900;
+    }
+
+    .notice-box {
+      min-height: 0;
+      padding: clamp(12px, 1.25vw, 18px);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    .notice-box h2 {
+      margin: 0;
+      font-size: clamp(20px, 1.55vw, 30px);
+      line-height: 1;
+    }
+
+    .notice-section-title {
+      margin: 0;
+      color: #6f5631;
+      font-size: clamp(15px, 1vw, 18px);
+      font-weight: 900;
+    }
+
+    .notice-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      align-content: start;
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    .notice-list li {
+      padding: 9px 10px;
+      border-left: 8px solid #8a9f75;
+      background: rgba(255, 255, 255, .56);
+      border-radius: 8px;
+      font-size: clamp(16px, 1.08vw, 22px);
+      line-height: 1.22;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
+    .notice-list.daily li { border-left-color: var(--gold); }
+
+    .empty {
+      color: var(--muted);
+      font-size: clamp(15px, 1vw, 20px);
+      text-align: center;
+      align-self: center;
+    }
+
+    .class-calm-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(255, 245, 239, .92);
+      border: 3px solid rgba(184, 78, 67, .38);
+      box-shadow: var(--shadow);
+      text-align: center;
+      color: var(--calm);
+      font-size: clamp(64px, 9vw, 156px);
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    dialog {
+      width: min(1160px, calc(100vw - 36px));
+      max-height: calc(100vh - 36px);
+      border: 0;
+      border-radius: 8px;
+      padding: 0;
+      background: var(--paper);
+      color: var(--ink);
+      box-shadow: 0 26px 70px rgba(34, 31, 25, .33);
+    }
+
+    dialog::backdrop { background: rgba(39, 50, 46, .4); }
+
+    .missing-dialog { width: min(560px, calc(100vw - 36px)); }
+
+    .missing-view {
+      padding: 22px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .missing-view h2 {
+      margin: 0;
+      font-size: 30px;
+    }
+
+    .missing-view ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 10px;
+    }
+
+    .missing-view li {
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: #fff5ed;
+      border-left: 8px solid var(--calm);
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1.25;
+    }
+
+    .settings {
+      max-height: calc(100vh - 36px);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+    }
+
+    .settings-header, .settings-footer {
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .settings-footer {
+      border-top: 1px solid var(--line);
+      border-bottom: 0;
+      justify-content: flex-end;
+      background: #fff6e6;
+    }
+
+    .settings-header h2 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    .settings-body {
+      min-height: 0;
+      overflow: auto;
+      padding: 18px 22px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .section {
+      padding: 16px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .58);
+      border: 1px solid rgba(120, 95, 61, .15);
+    }
+
+    .section h3 {
+      margin: 0 0 12px;
+      font-size: 21px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid #cfc0aa;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: white;
+      color: var(--ink);
+      resize: vertical;
+    }
+
+    textarea { min-height: 82px; }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .tab-btn {
+      min-height: 38px;
+      border-radius: 8px;
+      padding: 8px 12px;
+      background: #fffaf1;
+      color: var(--ink);
+      border: 1px solid #cfc0aa;
+      font-weight: 900;
+    }
+
+    .tab-btn.active {
+      background: #3e765d;
+      color: white;
+      border-color: #3e765d;
+    }
+
+    .period-table {
+      display: grid;
+      gap: 8px;
+    }
+
+    .period-row {
+      display: grid;
+      grid-template-columns: minmax(96px, 1fr) 118px 118px;
+      gap: 8px;
+      align-items: end;
+    }
+
+    .notice-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .student-editor {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .edit-card {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border-radius: 8px;
+      background: white;
+      border: 1px solid #ded2bf;
+    }
+
+    .seg {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 8px;
+      background: #f2eadc;
+    }
+
+    .seg button {
+      min-height: 34px;
+      border-radius: 6px;
+      color: var(--muted);
+      background: transparent;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .seg button.active {
+      background: white;
+      color: var(--ink);
+      box-shadow: 0 3px 10px rgba(72, 56, 34, .12);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .primary, .secondary, .danger {
+      min-height: 42px;
+      border-radius: 8px;
+      padding: 9px 14px;
+      font-weight: 900;
+    }
+
+    .primary { background: #3e765d; color: white; }
+    .secondary { background: #fffaf1; color: var(--ink); border: 1px solid #cfc0aa; }
+    .danger { background: #f6e0da; color: #8d3e36; border: 1px solid #dfb4aa; }
+
+    .sync-state {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    details {
+      margin-top: 12px;
+      border-radius: 8px;
+      background: #f8efe0;
+      border: 1px solid #dfceb5;
+      padding: 12px;
+    }
+
+    details summary {
+      cursor: pointer;
+      font-weight: 900;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      overflow: auto;
+      max-height: 320px;
+      padding: 12px;
+      background: #2d302c;
+      color: #fff8e9;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    @media (max-aspect-ratio: 4/3) {
+      main {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) auto;
+      }
+
+      .side {
+        grid-template-columns: minmax(180px, .7fr) minmax(0, 1.3fr);
+        grid-template-rows: auto;
+      }
+
+      .notice-box h2 { font-size: clamp(18px, 2.4vw, 28px); }
+      .notice-list li { font-size: clamp(16px, 2vw, 23px); }
+    }
+
+    @media (max-width: 1100px) {
+      header {
+        grid-template-columns: minmax(0, 1fr) auto auto;
+      }
+
+      .summary {
+        display: none;
+      }
+
+      main {
+        grid-template-columns: minmax(0, 1fr) minmax(190px, 22vw);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>下課狀態看板</h1>
+        <div class="subtitle" id="syncText">尚未同步，老師可手動調整。</div>
+      </div>
+      <div class="summary" aria-label="班級狀態統計">
+        <div class="pill"><strong id="okCount">0</strong><span>可以下課</span></div>
+        <div class="pill"><strong id="calmCount">0</strong><span>下課冷靜</span></div>
+      </div>
+      <div class="main-actions" aria-label="主面板操作">
+        <button class="main-action-btn calm-all" id="calmAll" type="button">全班冷靜</button>
+        <button class="main-action-btn" id="fullScreen" type="button">全螢幕</button>
+      </div>
+      <button class="icon-btn" id="openSettings" title="老師設定" aria-label="老師設定">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"/>
+          <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.36a1.7 1.7 0 0 0-1 .28 1.7 1.7 0 0 0-.82 1.45V21a2 2 0 0 1-4 0v-.09a1.7 1.7 0 0 0-.82-1.45 1.7 1.7 0 0 0-1-.28 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.64 15a1.7 1.7 0 0 0-.28-1 1.7 1.7 0 0 0-1.45-.82H2.8a2 2 0 0 1 0-4h.09a1.7 1.7 0 0 0 1.45-.82 1.7 1.7 0 0 0 .28-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06A2 2 0 0 1 7.05 2.6l.06.06A1.7 1.7 0 0 0 9 3a1.7 1.7 0 0 0 1-.28 1.7 1.7 0 0 0 .82-1.45V1.2a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15.64 2.74a1.7 1.7 0 0 0 1 .28 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.36 9c.08.34.17.67.28 1 .18.5.65.82 1.17.82h.09a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.41.18Z"/>
+        </svg>
+      </button>
+    </header>
+
+    <div id="appMessage" class="message" role="status"></div>
+
+    <main>
+      <section class="board" id="board" aria-label="學生下課狀態"></section>
+      <aside class="side" aria-label="公告與提醒">
+        <div class="clock">
+          <strong id="timeNow">--:--</strong>
+          <span id="dateNow">--</span>
+          <div class="period-now" id="periodNow">目前時段：--</div>
+        </div>
+        <section class="notice-box">
+          <h2>提醒</h2>
+          <p class="notice-section-title">本週固定叮嚀</p>
+          <ul class="notice-list" id="weeklyList"></ul>
+          <p class="notice-section-title">今日臨時提醒</p>
+          <ul class="notice-list daily" id="dailyList"></ul>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <dialog id="settingsDialog">
+    <form class="settings" method="dialog">
+      <div class="settings-header">
+        <h2>老師設定</h2>
+        <button class="icon-btn" value="close" aria-label="關閉設定" title="關閉設定">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M18 6 6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="settings-body">
+        <section class="section">
+          <h3>資料同步</h3>
+          <div class="form-grid">
+            <label>Google 試算表網址
+              <input id="sheetUrl" placeholder="貼上 Google Sheets 連結">
+            </label>
+            <label>Apps Script 網頁應用程式網址
+              <input id="scriptUrl" placeholder="建議使用 Apps Script，才能讀取儲存格顏色">
+            </label>
+            <label>學生人數
+              <input id="studentCount" type="number" min="1" max="40" step="1">
+            </label>
+            <label>自動同步間隔
+              <select id="syncMinutes">
+                <option value="0">不自動同步</option>
+                <option value="1">每 1 分鐘</option>
+                <option value="3">每 3 分鐘</option>
+                <option value="5">每 5 分鐘</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions">
+            <button type="button" class="primary" id="syncNow">立即同步</button>
+            <button type="button" class="secondary" id="clearManual">清除手動覆蓋</button>
+          </div>
+          <p class="sync-state" id="syncHelp">請用 localhost 開啟本頁，再用 Apps Script 同步紅色格子。直接雙擊 index.html 可能會同步失敗。</p>
+          <details>
+            <summary>Apps Script 範本</summary>
+            <p class="sync-state">同一份程式也放在 <code>apps-script.gs</code>。表格格式：A 欄座號、B 欄姓名、C 欄之後是作業；第 1 列是作業名稱，第 2 列開始是學生。</p>
+            <pre id="scriptCode"></pre>
+          </details>
+        </section>
+
+        <section class="section">
+          <h3>每日時段時間</h3>
+          <div class="period-table" id="periodEditor"></div>
+        </section>
+
+        <section class="section">
+          <h3>分時段公告</h3>
+          <div class="tabs" id="dayTabs"></div>
+          <div class="notice-grid" id="noticeEditor"></div>
+        </section>
+
+        <section class="section">
+          <h3>學生狀態</h3>
+          <div class="student-editor" id="studentEditor"></div>
+        </section>
+      </div>
+
+      <div class="settings-footer">
+        <button type="button" class="danger" id="resetAll">重設全部資料</button>
+        <button type="button" class="primary" id="saveSettings">儲存設定</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="missingDialog" class="missing-dialog">
+    <form method="dialog" class="missing-view">
+      <h2 id="missingTitle">未交作業</h2>
+      <ul id="missingList"></ul>
+      <button class="primary" value="close">關閉</button>
+    </form>
+  </dialog>
+
+  <script>
+    const STORAGE_KEY = "calmBreakBoard.v3";
+    const LEGACY_KEYS = ["calmBreakBoard.v1", "calmBreakBoard.v2"];
+    const DEFAULT_SHEET = "https://docs.google.com/spreadsheets/d/177Y85ttjaTahQyNXvkD7Lve9SBqqCvxt8FrFTyagKEM/edit?usp=sharing";
+    const DEFAULT_STUDENT_COUNT = 25;
+    const DAY_LABELS = { 1: "週一", 2: "週二", 3: "週三", 4: "週四", 5: "週五" };
+    const PERIODS = [
+      { id: "cleaning", label: "打掃時間", start: "07:35", end: "07:50" },
+      { id: "morning", label: "早自習", start: "07:50", end: "08:35" },
+      { id: "p1", label: "第一節", start: "08:40", end: "09:20" },
+      { id: "p2", label: "第二節", start: "09:30", end: "10:10" },
+      { id: "p3", label: "第三節", start: "10:30", end: "11:10" },
+      { id: "p4", label: "第四節", start: "11:20", end: "12:00" },
+      { id: "lunch", label: "午餐", start: "12:00", end: "12:35" },
+      { id: "nap", label: "午休", start: "12:35", end: "13:10" },
+      { id: "p5", label: "第五節", start: "13:20", end: "14:00" },
+      { id: "p6", label: "第六節", start: "14:10", end: "14:50" },
+      { id: "p7", label: "第七節", start: "15:10", end: "15:50" }
+    ];
+    const SCRIPT_SAMPLE = `const SEAT_COLUMN = 1;
+const NAME_COLUMN = 2;
+const HEADER_ROW = 1;
+const FIRST_STUDENT_ROW = 2;
+const FIRST_ASSIGNMENT_COLUMN = 3;
+const RED_COLORS = ["#ff0000", "#ea4335", "rgb(255, 0, 0)"];
+
+function doGet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const bySeat = {};
+
+  ss.getSheets().forEach(sheet => {
+    const sheetName = sheet.getName();
+    const range = sheet.getDataRange();
+    const values = range.getDisplayValues();
+    const backgrounds = range.getBackgrounds();
+    if (!values.length) return;
+
+    const headers = values[HEADER_ROW - 1] || [];
+    for (let r = FIRST_STUDENT_ROW - 1; r < values.length; r++) {
+      const seat = String(values[r][SEAT_COLUMN - 1] || "").trim();
+      if (!isStudentSeat(seat)) continue;
+
+      const rawName = String(values[r][NAME_COLUMN - 1] || "").trim();
+      if (!rawName) continue;
+      const studentNumber = Number(seat) || r;
+      const displayName = rawName ? seat + "號 " + rawName : seat + "號";
+      if (!bySeat[seat]) bySeat[seat] = { seat, studentNumber, name: displayName, calm: false, missing: [] };
+
+      for (let c = FIRST_ASSIGNMENT_COLUMN - 1; c < backgrounds[r].length; c++) {
+        if (!isRedCellColor(backgrounds[r][c])) continue;
+        bySeat[seat].calm = true;
+        bySeat[seat].missing.push(titleForCell(headers, c, sheetName));
+      }
+    }
+  });
+
+  const students = Object.values(bySeat)
+    .sort((a, b) => a.studentNumber - b.studentNumber)
+    .map(student => ({
+      seat: student.seat,
+      name: student.name,
+      calm: student.calm,
+      missing: [...new Set(student.missing)]
+    }));
+
+  return ContentService
+    .createTextOutput(JSON.stringify({ ok: true, updatedAt: new Date().toISOString(), students }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function titleForCell(headers, col, sheetName) {
+  const header = String(headers[col] || "").trim();
+  return sheetName + "：" + (header || "未命名作業");
+}
+
+function isRedCellColor(color) {
+  const value = String(color || "").trim().toLowerCase();
+  if (RED_COLORS.includes(value)) return true;
+  const hex = value.match(/^#([0-9a-f]{6})$/);
+  if (hex) return isStrictRed(parseInt(hex[1].slice(0, 2), 16), parseInt(hex[1].slice(2, 4), 16), parseInt(hex[1].slice(4, 6), 16));
+  const rgb = value.match(/^rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/);
+  if (rgb) return isStrictRed(Number(rgb[1]), Number(rgb[2]), Number(rgb[3]));
+  return false;
+}
+
+function isStrictRed(r, g, b) {
+  return r >= 220 && g <= 85 && b <= 85 && r > g * 2.4 && r > b * 2.4;
+}
+
+function isStudentSeat(value) {
+  return /^\\d+$/.test(String(value || "").trim());
+}`;
+
+    const els = {
+      appMessage: document.getElementById("appMessage"),
+      board: document.getElementById("board"),
+      editor: document.getElementById("studentEditor"),
+      periodEditor: document.getElementById("periodEditor"),
+      noticeEditor: document.getElementById("noticeEditor"),
+      dayTabs: document.getElementById("dayTabs"),
+      okCount: document.getElementById("okCount"),
+      calmCount: document.getElementById("calmCount"),
+      syncText: document.getElementById("syncText"),
+      timeNow: document.getElementById("timeNow"),
+      dateNow: document.getElementById("dateNow"),
+      periodNow: document.getElementById("periodNow"),
+      weeklyList: document.getElementById("weeklyList"),
+      dailyList: document.getElementById("dailyList"),
+      dialog: document.getElementById("settingsDialog"),
+      missingDialog: document.getElementById("missingDialog"),
+      missingTitle: document.getElementById("missingTitle"),
+      missingList: document.getElementById("missingList"),
+      openSettings: document.getElementById("openSettings"),
+      sheetUrl: document.getElementById("sheetUrl"),
+      scriptUrl: document.getElementById("scriptUrl"),
+      studentCount: document.getElementById("studentCount"),
+      syncMinutes: document.getElementById("syncMinutes"),
+      syncNow: document.getElementById("syncNow"),
+      clearManual: document.getElementById("clearManual"),
+      calmAll: document.getElementById("calmAll"),
+      fullScreen: document.getElementById("fullScreen"),
+      resetAll: document.getElementById("resetAll"),
+      saveSettings: document.getElementById("saveSettings"),
+      syncHelp: document.getElementById("syncHelp"),
+      scriptCode: document.getElementById("scriptCode")
+    };
+
+    let state = loadState();
+    let syncTimer = null;
+    let editingDay = normalizedWeekday(new Date().getDay());
+
+    boot();
+
+    function boot() {
+      els.scriptCode.textContent = SCRIPT_SAMPLE;
+      bindEvents();
+      render();
+      hydrateSettings();
+      startClock();
+      scheduleSync();
+      if (location.protocol === "file:") {
+        showMessage("請不要直接雙擊 index.html，請使用 localhost 或 Live Server 開啟。同步 Google 資料時，file:// 很容易被瀏覽器擋住。", "warn", true);
+      }
+      window.addEventListener("error", event => {
+        showMessage(`畫面發生錯誤：${event.message || "請重新整理後再試"}`, "error", true);
+      });
+    }
+
+    function bindEvents() {
+      els.openSettings.addEventListener("click", () => {
+        hydrateSettings();
+        els.dialog.showModal();
+      });
+      els.saveSettings.addEventListener("click", () => {
+        collectSettings();
+        saveState();
+        render();
+        scheduleSync();
+        els.dialog.close();
+      });
+      els.syncNow.addEventListener("click", async () => {
+        collectSettings();
+        await syncFromSource();
+        hydrateSettings();
+      });
+      els.clearManual.addEventListener("click", () => {
+        state.students.forEach(student => student.manual = null);
+        saveState();
+        render();
+        hydrateSettings();
+      });
+      els.calmAll.addEventListener("click", () => {
+        state.classCalm = !state.classCalm;
+        saveState();
+        render();
+        hydrateSettings();
+      });
+      els.fullScreen.addEventListener("click", () => {
+        if (els.dialog.open) els.dialog.close();
+        document.documentElement.requestFullscreen?.();
+      });
+      els.resetAll.addEventListener("click", () => {
+        if (!confirm("確定要重設全部資料？")) return;
+        safeRemove(STORAGE_KEY);
+        LEGACY_KEYS.forEach(safeRemove);
+        state = defaultState();
+        saveState();
+        render();
+        hydrateSettings();
+        scheduleSync();
+      });
+    }
+
+    function defaultState() {
+      return normalizeState({
+        sheetUrl: DEFAULT_SHEET,
+        scriptUrl: "",
+        studentCount: DEFAULT_STUDENT_COUNT,
+        classCalm: false,
+        syncMinutes: "0",
+        periods: PERIODS,
+        students: buildStudents(DEFAULT_STUDENT_COUNT),
+        weekly: buildNoticeMap({
+          morning: ["先整理座位與心情，準備開始一天。"],
+          lunch: ["先洗手、安靜排隊，謝謝午餐服務同學。"],
+          nap: ["放低音量，讓自己和同學都能休息。"]
+        }),
+        daily: buildNoticeMap({}),
+        lastSync: ""
+      });
+    }
+
+    function loadState() {
+      const saved = safeGet(STORAGE_KEY);
+      if (saved) {
+        try { return normalizeState(JSON.parse(saved)); } catch (_) {}
+      }
+      return defaultState();
+    }
+
+    function normalizeState(input) {
+      const count = clampStudentCount(input.studentCount || input.students?.length || DEFAULT_STUDENT_COUNT);
+      const students = Array.isArray(input.students) ? input.students.slice(0, count) : [];
+      while (students.length < count) students.push({ name: `${students.length + 1}號`, calm: false, manual: null, missing: [] });
+      return {
+        sheetUrl: input.sheetUrl || DEFAULT_SHEET,
+        scriptUrl: input.scriptUrl || "",
+        studentCount: count,
+        classCalm: Boolean(input.classCalm),
+        syncMinutes: String(input.syncMinutes ?? "0"),
+        periods: normalizePeriods(input.periods),
+        students: students.map((student, index) => ({
+          name: String(student.name || `${index + 1}號`).trim(),
+          calm: Boolean(student.calm),
+          manual: student.manual === true ? true : student.manual === false ? false : null,
+          missing: normalizeMissing(student.missing || student.note)
+        })),
+        weekly: normalizeNoticeMap(input.weekly),
+        daily: normalizeNoticeMap(input.daily),
+        lastSync: input.lastSync || ""
+      };
+    }
+
+    function buildStudents(count) {
+      return Array.from({ length: count }, (_, index) => ({ name: `${index + 1}號`, calm: false, manual: null, missing: [] }));
+    }
+
+    function normalizePeriods(periods) {
+      const byId = Object.fromEntries((Array.isArray(periods) ? periods : []).map(period => [period.id, period]));
+      return PERIODS.map(period => ({ ...period, label: byId[period.id]?.label || period.label, start: byId[period.id]?.start || period.start, end: byId[period.id]?.end || period.end }));
+    }
+
+    function buildNoticeMap(seed) {
+      const map = {};
+      for (let day = 1; day <= 5; day++) {
+        map[day] = {};
+        PERIODS.forEach(period => {
+          map[day][period.id] = day === 1 && seed[period.id] ? seed[period.id] : [];
+        });
+      }
+      return map;
+    }
+
+    function normalizeNoticeMap(input) {
+      const map = buildNoticeMap({});
+      if (!input || typeof input !== "object") return map;
+      for (let day = 1; day <= 5; day++) {
+        const dayData = input[day] || {};
+        if (Array.isArray(dayData)) {
+          map[day].morning = dayData;
+        } else {
+          PERIODS.forEach(period => {
+            map[day][period.id] = splitLines(Array.isArray(dayData[period.id]) ? dayData[period.id].join("\n") : dayData[period.id] || "");
+          });
+        }
+      }
+      return map;
+    }
+
+    function normalizeMissing(value) {
+      if (Array.isArray(value)) return value.map(item => String(item).trim()).filter(Boolean);
+      return splitLines(String(value || "").replace(/[、,，]/g, "\n"));
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (_) {
+        showMessage("設定無法儲存，可能是瀏覽器封鎖 localStorage。請換用 localhost 開啟。", "error", true);
+      }
+    }
+
+    function safeGet(key) {
+      try { return localStorage.getItem(key); } catch (_) { return null; }
+    }
+
+    function safeRemove(key) {
+      try { localStorage.removeItem(key); } catch (_) {}
+    }
+
+    function currentCalm(student) {
+      if (state.classCalm) return true;
+      return student.manual === null ? student.calm : student.manual;
+    }
+
+    function render() {
+      renderBoard();
+      renderNotices();
+      renderSyncText();
+    }
+
+    function renderBoard() {
+      const cols = Math.ceil(Math.sqrt(state.students.length || 1));
+      els.board.style.setProperty("--board-cols", String(Math.min(Math.max(cols, 1), 7)));
+      els.board.innerHTML = "";
+      els.calmAll.textContent = state.classCalm ? "取消冷靜" : "全班冷靜";
+      els.calmAll.classList.toggle("calm-all", !state.classCalm);
+      let calmCount = 0;
+      state.students.forEach(student => {
+        const isCalm = currentCalm(student);
+        if (isCalm) calmCount++;
+        const card = document.createElement("article");
+        card.className = `student${isCalm ? " calm" : ""}${student.manual !== null ? " manual" : ""}`;
+        const nameClass = student.name.length >= 9 ? "extra-long-name" : student.name.length >= 6 ? "long-name" : "";
+        card.innerHTML = `
+          <button type="button" class="student-toggle" title="點一下可手動切換狀態">
+            <div class="student-name ${nameClass}">${escapeHtml(student.name)}</div>
+            <div class="status">${isCalm ? "下課冷靜" : "可以下課"}</div>
+          </button>
+          <button type="button" class="work-btn">${student.missing.length ? `作業 ${student.missing.length}` : "作業"}</button>
+        `;
+        card.querySelector(".student-toggle").addEventListener("click", () => {
+          student.manual = !isCalm;
+          saveState();
+          render();
+          hydrateSettings();
+        });
+        card.querySelector(".work-btn").addEventListener("click", () => showMissing(student));
+        els.board.appendChild(card);
+      });
+      if (state.classCalm) {
+        const overlay = document.createElement("div");
+        overlay.className = "class-calm-overlay";
+        overlay.textContent = "全班冷靜";
+        els.board.appendChild(overlay);
+      }
+      els.okCount.textContent = String(state.students.length - calmCount);
+      els.calmCount.textContent = String(calmCount);
+    }
+
+    function showMissing(student) {
+      els.missingTitle.textContent = `${student.name} 未交作業`;
+      els.missingList.innerHTML = "";
+      const items = student.missing.length ? student.missing : [currentCalm(student) ? "目前為手動或同步冷靜，沒有作業標題資料。" : "目前沒有未交作業。"];
+      items.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        els.missingList.appendChild(li);
+      });
+      els.missingDialog.showModal();
+    }
+
+    function renderNotices() {
+      const now = new Date();
+      const day = normalizedWeekday(now.getDay());
+      const period = currentPeriod(now);
+      els.periodNow.textContent = `目前時段：${period.label}`;
+      fillList(els.weeklyList, state.weekly[day]?.[period.id] || [], "此時段沒有固定叮嚀");
+      fillList(els.dailyList, state.daily[day]?.[period.id] || [], "此時段沒有臨時提醒");
+    }
+
+    function fillList(list, items, emptyText) {
+      list.innerHTML = "";
+      const cleanItems = items.map(item => String(item).trim()).filter(Boolean).slice(0, 5);
+      if (!cleanItems.length) {
+        const li = document.createElement("li");
+        li.className = "empty";
+        li.textContent = emptyText;
+        list.appendChild(li);
+        return;
+      }
+      cleanItems.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        list.appendChild(li);
+      });
+    }
+
+    function renderSyncText(message) {
+      if (message) {
+        els.syncText.textContent = message;
+      } else if (state.lastSync) {
+        els.syncText.textContent = `最後同步：${new Date(state.lastSync).toLocaleString("zh-TW", { hour12: false })}`;
+      } else {
+        els.syncText.textContent = "尚未同步，老師可手動調整。";
+      }
+    }
+
+    function hydrateSettings() {
+      els.sheetUrl.value = state.sheetUrl;
+      els.scriptUrl.value = state.scriptUrl;
+      els.studentCount.value = state.studentCount;
+      els.syncMinutes.value = state.syncMinutes;
+      renderPeriodEditor();
+      renderDayTabs();
+      renderNoticeEditor();
+      renderStudentEditor();
+    }
+
+    function renderPeriodEditor() {
+      els.periodEditor.innerHTML = "";
+      state.periods.forEach(period => {
+        const row = document.createElement("div");
+        row.className = "period-row";
+        row.innerHTML = `
+          <label>${escapeHtml(period.label)}<input value="${escapeAttribute(period.label)}" data-period-label="${period.id}"></label>
+          <label>開始<input type="time" value="${escapeAttribute(period.start)}" data-period-start="${period.id}"></label>
+          <label>結束<input type="time" value="${escapeAttribute(period.end)}" data-period-end="${period.id}"></label>
+        `;
+        els.periodEditor.appendChild(row);
+      });
+    }
+
+    function renderDayTabs() {
+      els.dayTabs.innerHTML = "";
+      for (let day = 1; day <= 5; day++) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `tab-btn${day === editingDay ? " active" : ""}`;
+        button.textContent = DAY_LABELS[day];
+        button.addEventListener("click", () => {
+          collectSettings();
+          editingDay = day;
+          renderDayTabs();
+          renderNoticeEditor();
+        });
+        els.dayTabs.appendChild(button);
+      }
+    }
+
+    function renderNoticeEditor() {
+      els.noticeEditor.innerHTML = "";
+      state.periods.forEach(period => {
+        const weekly = state.weekly[editingDay]?.[period.id] || [];
+        const daily = state.daily[editingDay]?.[period.id] || [];
+        const wrapper = document.createElement("div");
+        wrapper.className = "section";
+        wrapper.innerHTML = `
+          <h3>${escapeHtml(period.label)}</h3>
+          <label>每週固定叮嚀<textarea data-weekly="${period.id}" placeholder="一行一則">${escapeHtml(weekly.join("\n"))}</textarea></label>
+          <label>今日臨時提醒<textarea data-daily="${period.id}" placeholder="一行一則">${escapeHtml(daily.join("\n"))}</textarea></label>
+        `;
+        els.noticeEditor.appendChild(wrapper);
+      });
+    }
+
+    function renderStudentEditor() {
+      els.editor.innerHTML = "";
+      state.students.forEach((student, index) => {
+        const card = document.createElement("div");
+        card.className = "edit-card";
+        card.innerHTML = `
+          <input value="${escapeAttribute(student.name)}" aria-label="學生姓名">
+          <div class="seg">
+            <button type="button" data-mode="auto" class="${student.manual === null ? "active" : ""}">同步</button>
+            <button type="button" data-mode="ok" class="${student.manual === false ? "active" : ""}">可下課</button>
+            <button type="button" data-mode="calm" class="${student.manual === true ? "active" : ""}">冷靜</button>
+          </div>
+          <div class="sync-state">${escapeHtml(student.missing.join("、") || "無未交標題")}</div>
+        `;
+        card.querySelector("input").addEventListener("input", event => {
+          state.students[index].name = event.target.value;
+          saveState();
+          render();
+        });
+        card.querySelectorAll("button").forEach(button => {
+          button.addEventListener("click", () => {
+            const mode = button.dataset.mode;
+            state.students[index].manual = mode === "auto" ? null : mode === "calm";
+            saveState();
+            render();
+            hydrateSettings();
+          });
+        });
+        els.editor.appendChild(card);
+      });
+    }
+
+    function collectSettings() {
+      state.sheetUrl = els.sheetUrl.value.trim();
+      state.scriptUrl = els.scriptUrl.value.trim();
+      state.syncMinutes = els.syncMinutes.value;
+      resizeStudents(clampStudentCount(els.studentCount.value));
+      state.periods.forEach(period => {
+        const labelInput = els.periodEditor.querySelector(`[data-period-label="${period.id}"]`);
+        const startInput = els.periodEditor.querySelector(`[data-period-start="${period.id}"]`);
+        const endInput = els.periodEditor.querySelector(`[data-period-end="${period.id}"]`);
+        period.label = labelInput.value.trim() || period.label;
+        period.start = startInput.value || period.start;
+        period.end = endInput.value || period.end;
+      });
+      els.noticeEditor.querySelectorAll("[data-weekly]").forEach(textarea => {
+        state.weekly[editingDay][textarea.dataset.weekly] = splitLines(textarea.value);
+      });
+      els.noticeEditor.querySelectorAll("[data-daily]").forEach(textarea => {
+        state.daily[editingDay][textarea.dataset.daily] = splitLines(textarea.value);
+      });
+      saveState();
+      render();
+    }
+
+    function resizeStudents(count) {
+      state.studentCount = count;
+      while (state.students.length < count) state.students.push({ name: `${state.students.length + 1}號`, calm: false, manual: null, missing: [] });
+      state.students = state.students.slice(0, count);
+    }
+
+    async function syncFromSource() {
+      if (location.protocol === "file:") {
+        showMessage("請不要直接雙擊 index.html，請使用 localhost 或 Live Server 開啟。", "warn", true);
+        return;
+      }
+      els.syncHelp.textContent = "同步中...";
+      showMessage("正在同步資料...", "ok", false);
+      try {
+        const data = state.scriptUrl ? await fetchAppsScript(state.scriptUrl) : await fetchSheetValues(state.sheetUrl);
+        applySyncData(data);
+        state.lastSync = new Date().toISOString();
+        saveState();
+        render();
+        els.syncHelp.textContent = "同步完成。";
+        showMessage("同步完成。", "ok", false);
+      } catch (error) {
+        const message = friendlySyncError(error);
+        els.syncHelp.textContent = message;
+        renderSyncText("同步失敗，仍可手動調整。");
+        showMessage(message, "error", true);
+      }
+    }
+
+    async function fetchAppsScript(url) {
+      if (!/^https:\/\/script\.google\.com\/macros\/s\//.test(url)) {
+        throw new SyncError("APPS_SCRIPT_URL", "Apps Script 網址看起來不正確，請貼上部署後的「網頁應用程式」網址。");
+      }
+      let response;
+      try {
+        response = await fetch(url, { method: "GET", cache: "no-store" });
+      } catch (error) {
+        throw new SyncError("NETWORK_OR_CORS", "連不到 Apps Script。可能是網路中斷，或瀏覽器被 CORS 擋住。", error);
+      }
+      if (!response.ok) {
+        throw new SyncError("APPS_SCRIPT_HTTP", `Apps Script 回應錯誤 ${response.status}。請確認部署權限是「任何知道連結的人」。`);
+      }
+      const text = await response.text();
+      try {
+        return JSON.parse(text);
+      } catch (error) {
+        throw new SyncError("NOT_JSON", "Apps Script 回傳的不是 JSON。請確認部署的是本專案提供的 Apps Script 程式碼。", error);
+      }
+    }
+
+    function fetchSheetValues(url) {
+      const id = extractSheetId(url);
+      if (!id) throw new SyncError("SHEET_URL", "Google 試算表網址格式不正確。請貼上完整的 Google Sheets 連結。");
+      return new Promise((resolve, reject) => {
+        const callback = `sheetCallback_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        const script = document.createElement("script");
+        const timer = setTimeout(() => {
+          cleanup();
+          reject(new SyncError("SHEET_TIMEOUT", "讀取 Google 試算表逾時。請確認試算表已公開，或改用 Apps Script 同步。"));
+        }, 12000);
+
+        window[callback] = payload => {
+          cleanup();
+          const rows = payload?.table?.rows;
+          if (!Array.isArray(rows)) {
+            reject(new SyncError("SHEET_PRIVATE", "Google 試算表沒有公開，或資料格式不符合。請確認分享權限。"));
+            return;
+          }
+          const values = rows.map(row => (row.c || []).map(cell => cell?.f ?? cell?.v ?? ""));
+          resolve({ values });
+        };
+
+        function cleanup() {
+          clearTimeout(timer);
+          delete window[callback];
+          script.remove();
+        }
+
+        script.onerror = () => {
+          cleanup();
+          reject(new SyncError("SHEET_NETWORK", "無法連到 Google 試算表。可能是網路問題、試算表未公開，或瀏覽器阻擋。"));
+        };
+
+        script.src = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=responseHandler:${callback};out:json`;
+        document.head.appendChild(script);
+      });
+    }
+
+    function applySyncData(data) {
+      const incoming = Array.isArray(data?.students) ? data.students : valuesToStudents(data?.values || []);
+      if (!incoming.length) throw new SyncError("BAD_DATA", "同步成功，但沒有讀到學生資料。請確認 A 欄座號、B 欄姓名，且第 2 列開始是學生。");
+      resizeStudents(Math.max(state.studentCount, incoming.length));
+      incoming.slice(0, state.studentCount).forEach((item, index) => {
+        const existing = state.students[index] || {};
+        state.students[index] = {
+          name: String(item.name || existing.name || `${index + 1}號`).trim(),
+          calm: Boolean(item.calm || item.missing?.length),
+          manual: existing.manual === true ? true : existing.manual === false ? false : null,
+          missing: normalizeMissing(item.missing || "")
+        };
+      });
+    }
+
+    function valuesToStudents(values) {
+      const headers = values[0] || [];
+      return values.slice(1).map(row => {
+        const seat = String(row[0] || "").trim();
+        const rawName = String(row[1] || "").trim();
+        if (!isStudentSeat(seat) || !rawName) return null;
+        const name = `${seat}號 ${rawName}`;
+        return { name, calm: false, missing: [] };
+      }).filter(Boolean);
+    }
+
+    function friendlySyncError(error) {
+      if (error instanceof SyncError) return error.message;
+      if (String(error?.message || "").includes("Failed to fetch")) return "網路失敗或 CORS 被擋。請確認使用 localhost 開啟，並確認 Apps Script 已部署成網頁應用程式。";
+      return `同步失敗：${error?.message || "請檢查網路、權限與 Apps Script 網址。"}`;
+    }
+
+    class SyncError extends Error {
+      constructor(code, message, cause) {
+        super(message);
+        this.name = "SyncError";
+        this.code = code;
+        this.cause = cause;
+      }
+    }
+
+    function showMessage(text, type = "warn", sticky = false) {
+      els.appMessage.textContent = text;
+      els.appMessage.className = `message show ${type}`;
+      if (!sticky) {
+        window.clearTimeout(showMessage.timer);
+        showMessage.timer = window.setTimeout(() => {
+          els.appMessage.className = "message";
+          els.appMessage.textContent = "";
+        }, 4500);
+      }
+    }
+
+    function splitLines(value) {
+      return String(value || "").split(/\n/).map(line => line.trim()).filter(Boolean);
+    }
+
+    function extractSheetId(url) {
+      const match = String(url || "").match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      return match ? match[1] : "";
+    }
+
+    function isStudentSeat(value) {
+      return /^\d+$/.test(String(value || "").trim());
+    }
+
+    function scheduleSync() {
+      if (syncTimer) clearInterval(syncTimer);
+      const minutes = Number(state.syncMinutes);
+      if (!minutes) return;
+      syncTimer = setInterval(syncFromSource, minutes * 60 * 1000);
+    }
+
+    function startClock() {
+      updateClock();
+      setInterval(updateClock, 1000);
+    }
+
+    function updateClock() {
+      const now = new Date();
+      els.timeNow.textContent = now.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false });
+      els.dateNow.textContent = now.toLocaleDateString("zh-TW", { month: "long", day: "numeric", weekday: "long" });
+      renderNotices();
+    }
+
+    function currentPeriod(date) {
+      const minute = date.getHours() * 60 + date.getMinutes();
+      const found = state.periods.find(period => minute >= toMinutes(period.start) && minute <= toMinutes(period.end));
+      return found || state.periods.find(period => minute < toMinutes(period.start)) || state.periods[state.periods.length - 1];
+    }
+
+    function toMinutes(value) {
+      const [hour, minute] = String(value || "00:00").split(":").map(Number);
+      return hour * 60 + minute;
+    }
+
+    function normalizedWeekday(day) {
+      return day >= 1 && day <= 5 ? day : 1;
+    }
+
+    function clampStudentCount(value) {
+      const count = Number.parseInt(value, 10);
+      if (!Number.isFinite(count)) return DEFAULT_STUDENT_COUNT;
+      return Math.min(Math.max(count, 1), 40);
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[char]));
+    }
+
+    function escapeAttribute(value) {
+      return escapeHtml(value).replace(/`/g, "&#096;");
+    }
+  </script>
+</body>
+</html>

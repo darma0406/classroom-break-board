@@ -1,0 +1,15 @@
+node_modules/
+.env
+.env.*
+.server.pid
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs and temporary files
+*.log
+*.tmp
+tmp/
+temp/

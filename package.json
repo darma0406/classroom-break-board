@@ -1,0 +1,9 @@
+{
+  "name": "calm-break-board",
+  "version": "1.0.0",
+  "private": true,
+  "description": "國小教室下課狀態看板",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
