@@ -177,11 +177,11 @@
       min-width: 0;
       min-height: 0;
       border-radius: 8px;
-      padding: clamp(9px, .75vw, 13px);
-      display: grid;
-      grid-template-rows: minmax(0, 1fr) auto;
-      align-items: stretch;
-      gap: clamp(7px, .65vw, 10px);
+      padding: clamp(8px, .66vw, 12px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: clamp(7px, .58vw, 10px);
       border: 2px solid rgba(70, 105, 82, .22);
       background: linear-gradient(160deg, #fbfff7, var(--ok-bg));
       box-shadow: var(--shadow);
@@ -209,12 +209,11 @@
 
     .student-toggle {
       min-width: 0;
-      min-height: 0;
+      width: 100%;
+      min-height: clamp(38px, 3vw, 52px);
       display: grid;
-      grid-template-rows: minmax(0, 1fr) auto;
-      align-items: center;
-      gap: clamp(6px, .62vw, 9px);
-      padding: 0;
+      place-items: center;
+      padding: 0 4px;
       background: transparent;
       color: inherit;
     }
@@ -222,7 +221,6 @@
     .student-name {
       min-width: 0;
       max-width: 100%;
-      align-self: center;
       text-align: center;
       font-size: clamp(17px, 1.7vw, 32px);
       font-weight: 900;
@@ -235,31 +233,43 @@
     .student-name.long-name { font-size: clamp(15px, 1.35vw, 25px); }
     .student-name.extra-long-name { font-size: clamp(13px, 1.05vw, 20px); line-height: 1.2; }
 
+    .student-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: clamp(6px, .55vw, 10px);
+      width: 100%;
+    }
+
     .status {
-      padding: clamp(6px, .72vw, 10px);
-      border-radius: 8px;
+      width: auto;
+      min-width: fit-content;
+      padding: clamp(6px, .55vw, 9px) clamp(12px, 1vw, 18px);
+      border-radius: 999px;
       background: var(--ok);
       color: white;
-      font-size: clamp(15px, 1.12vw, 22px);
+      font-size: clamp(14px, 1vw, 20px);
       font-weight: 900;
       line-height: 1.08;
       text-align: center;
+      white-space: nowrap;
     }
 
     .calm .status { background: var(--calm); }
 
     .work-btn {
-      justify-self: end;
-      min-height: 30px;
-      max-width: 100%;
-      padding: 5px 10px;
-      border-radius: 8px;
+      flex: 0 0 auto;
+      min-width: clamp(58px, 4.8vw, 82px);
+      min-height: clamp(30px, 2.3vw, 38px);
+      padding: 5px 9px;
+      border-radius: 999px;
       background: rgba(255, 250, 241, .9);
       color: #6d4d2d;
       border: 1px solid rgba(138, 104, 58, .24);
       font-size: clamp(12px, .86vw, 15px);
       font-weight: 900;
       box-shadow: 0 4px 10px rgba(72, 56, 34, .08);
+      white-space: nowrap;
     }
 
     .side {
@@ -1095,13 +1105,21 @@ function isStudentSeat(value) {
         card.className = `student${isCalm ? " calm" : ""}${student.manual !== null ? " manual" : ""}`;
         const nameClass = student.name.length >= 9 ? "extra-long-name" : student.name.length >= 6 ? "long-name" : "";
         card.innerHTML = `
-          <button type="button" class="student-toggle" title="點一下可手動切換狀態">
+          <button type="button" class="student-toggle" title="??????????">
             <div class="student-name ${nameClass}">${escapeHtml(student.name)}</div>
-            <div class="status">${isCalm ? "下課冷靜" : "可以下課"}</div>
           </button>
-          <button type="button" class="work-btn">${student.missing.length ? `作業 ${student.missing.length}` : "作業"}</button>
+          <div class="student-actions">
+            <button type="button" class="status">${isCalm ? "????" : "????"}</button>
+            <button type="button" class="work-btn">${student.missing.length ? `?? ${student.missing.length}` : "??"}</button>
+          </div>
         `;
         card.querySelector(".student-toggle").addEventListener("click", () => {
+          student.manual = !isCalm;
+          saveState();
+          render();
+          hydrateSettings();
+        });
+        card.querySelector(".status").addEventListener("click", () => {
           student.manual = !isCalm;
           saveState();
           render();
