@@ -242,9 +242,10 @@
     }
 
     .status {
+      flex: 0 0 auto;
       width: auto;
-      min-width: fit-content;
-      padding: clamp(6px, .55vw, 9px) clamp(12px, 1vw, 18px);
+      min-width: max-content;
+      padding: clamp(6px, .55vw, 9px) clamp(14px, 1.15vw, 22px);
       border-radius: 999px;
       background: var(--ok);
       color: white;
@@ -253,15 +254,16 @@
       line-height: 1.08;
       text-align: center;
       white-space: nowrap;
+      overflow: visible;
     }
 
     .calm .status { background: var(--calm); }
 
     .work-btn {
       flex: 0 0 auto;
-      min-width: clamp(58px, 4.8vw, 82px);
+      min-width: clamp(64px, 5.2vw, 92px);
       min-height: clamp(30px, 2.3vw, 38px);
-      padding: 5px 9px;
+      padding: 5px 11px;
       border-radius: 999px;
       background: rgba(255, 250, 241, .9);
       color: #6d4d2d;
@@ -270,6 +272,7 @@
       font-weight: 900;
       box-shadow: 0 4px 10px rgba(72, 56, 34, .08);
       white-space: nowrap;
+      overflow: visible;
     }
 
     .side {
@@ -1105,12 +1108,12 @@ function isStudentSeat(value) {
         card.className = `student${isCalm ? " calm" : ""}${student.manual !== null ? " manual" : ""}`;
         const nameClass = student.name.length >= 9 ? "extra-long-name" : student.name.length >= 6 ? "long-name" : "";
         card.innerHTML = `
-          <button type="button" class="student-toggle" title="??????????">
+          <button type="button" class="student-toggle" title="點一下可手動切換狀態">
             <div class="student-name ${nameClass}">${escapeHtml(student.name)}</div>
           </button>
           <div class="student-actions">
-            <button type="button" class="status">${isCalm ? "????" : "????"}</button>
-            <button type="button" class="work-btn">${student.missing.length ? `?? ${student.missing.length}` : "??"}</button>
+            <button type="button" class="status">${isCalm ? "下課冷靜" : "可以下課"}</button>
+            <button type="button" class="work-btn">${student.missing.length ? `作業 ${student.missing.length}` : "作業"}</button>
           </div>
         `;
         card.querySelector(".student-toggle").addEventListener("click", () => {
