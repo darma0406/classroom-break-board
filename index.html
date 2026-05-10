@@ -69,16 +69,13 @@
       text-overflow: ellipsis;
     }
 
-    .summary {
+    .summary, .main-actions {
       display: flex;
       gap: 10px;
       align-items: center;
     }
 
     .main-actions {
-      display: flex;
-      gap: 8px;
-      align-items: center;
       flex-wrap: wrap;
       justify-content: flex-end;
     }
@@ -106,28 +103,9 @@
       font-size: clamp(13px, 1vw, 17px);
     }
 
-    .icon-btn {
-      width: 54px;
-      height: 54px;
-      display: grid;
-      place-items: center;
-      border-radius: 8px;
-      background: #fff9ee;
-      color: var(--ink);
-      border: 1px solid rgba(120, 95, 61, .18);
-      box-shadow: 0 8px 18px rgba(72, 56, 34, .11);
-    }
-
-    .icon-btn svg {
-      width: 27px;
-      height: 27px;
-      stroke-width: 2.2;
-    }
-
-    .main-action-btn {
+    .icon-btn, .main-action-btn {
       min-height: 44px;
       border-radius: 8px;
-      padding: 9px 13px;
       background: #fff9ee;
       color: var(--ink);
       border: 1px solid rgba(120, 95, 61, .2);
@@ -136,11 +114,22 @@
       white-space: nowrap;
     }
 
+    .main-action-btn { padding: 9px 13px; }
+
     .main-action-btn.calm-all {
       background: #f6e0da;
       color: #8d3e36;
       border-color: #dfb4aa;
     }
+
+    .icon-btn {
+      width: 54px;
+      height: 54px;
+      display: grid;
+      place-items: center;
+    }
+
+    .icon-btn svg { width: 27px; height: 27px; stroke-width: 2.2; }
 
     .message {
       display: none;
@@ -187,11 +176,17 @@
       box-shadow: var(--shadow);
       position: relative;
       overflow: hidden;
+      transition: background .2s ease, border-color .2s ease;
     }
 
     .student.calm {
       border-color: rgba(184, 78, 67, .35);
       background: linear-gradient(160deg, #fff7f4, var(--calm-bg));
+    }
+
+    .student.missing {
+      border-color: rgba(184, 78, 67, .45);
+      background: linear-gradient(160deg, #fff4ef, #f4d8d1);
     }
 
     .student.manual::after {
@@ -257,7 +252,7 @@
       overflow: visible;
     }
 
-    .calm .status { background: var(--calm); }
+    .calm .status, .missing .status { background: var(--calm); }
 
     .work-btn {
       flex: 0 0 auto;
@@ -321,7 +316,7 @@
       min-height: 0;
       padding: clamp(12px, 1.25vw, 18px);
       display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-rows: auto auto minmax(0, auto) auto minmax(0, 1fr);
       gap: 10px;
       overflow: hidden;
     }
@@ -632,33 +627,10 @@
       line-height: 1.45;
     }
 
-    @media (max-aspect-ratio: 4/3) {
-      main {
-        grid-template-columns: 1fr;
-        grid-template-rows: minmax(0, 1fr) auto;
-      }
-
-      .side {
-        grid-template-columns: minmax(180px, .7fr) minmax(0, 1.3fr);
-        grid-template-rows: auto;
-      }
-
-      .notice-box h2 { font-size: clamp(18px, 2.4vw, 28px); }
-      .notice-list li { font-size: clamp(16px, 2vw, 23px); }
-    }
-
     @media (max-width: 1100px) {
-      header {
-        grid-template-columns: minmax(0, 1fr) auto auto;
-      }
-
-      .summary {
-        display: none;
-      }
-
-      main {
-        grid-template-columns: minmax(0, 1fr) minmax(190px, 22vw);
-      }
+      header { grid-template-columns: minmax(0, 1fr) auto auto; }
+      .summary { display: none; }
+      main { grid-template-columns: minmax(0, 1fr) minmax(190px, 22vw); }
     }
   </style>
 </head>
@@ -725,28 +697,22 @@
               <input id="sheetUrl" placeholder="貼上 Google Sheets 連結">
             </label>
             <label>Apps Script 網頁應用程式網址
-              <input id="scriptUrl" placeholder="建議使用 Apps Script，才能讀取儲存格顏色">
+              <input id="scriptUrl" placeholder="貼上部署後的 Apps Script 網址">
             </label>
             <label>學生人數
               <input id="studentCount" type="number" min="1" max="40" step="1">
             </label>
-            <label>自動同步間隔
-              <select id="syncMinutes">
-                <option value="0">不自動同步</option>
-                <option value="1">每 1 分鐘</option>
-                <option value="3">每 3 分鐘</option>
-                <option value="5">每 5 分鐘</option>
-              </select>
+            <label>同步狀態
+              <input id="syncMode" readonly value="每 3 秒自動同步">
             </label>
           </div>
           <div class="actions">
             <button type="button" class="primary" id="syncNow">立即同步</button>
-            <button type="button" class="secondary" id="clearManual">清除手動覆蓋</button>
+            <button type="button" class="secondary" id="clearManual">清除本機快取</button>
           </div>
-          <p class="sync-state" id="syncHelp">請用 localhost 開啟本頁，再用 Apps Script 同步紅色格子。直接雙擊 index.html 可能會同步失敗。</p>
+          <p class="sync-state" id="syncHelp">設定 Apps Script 網址後，所有裝置會每 3 秒同步一次。localStorage 只保留快取，不是主要資料源。</p>
           <details>
-            <summary>Apps Script 範本</summary>
-            <p class="sync-state">同一份程式也放在 <code>apps-script.gs</code>。表格格式：A 欄座號、B 欄姓名、C 欄之後是作業；第 1 列是作業名稱，第 2 列開始是學生。</p>
+            <summary>Apps Script API</summary>
             <pre id="scriptCode"></pre>
           </details>
         </section>
@@ -769,7 +735,7 @@
       </div>
 
       <div class="settings-footer">
-        <button type="button" class="danger" id="resetAll">重設全部資料</button>
+        <button type="button" class="danger" id="resetAll">重設本機設定</button>
         <button type="button" class="primary" id="saveSettings">儲存設定</button>
       </div>
     </form>
@@ -784,10 +750,11 @@
   </dialog>
 
   <script>
-    const STORAGE_KEY = "calmBreakBoard.v3";
-    const LEGACY_KEYS = ["calmBreakBoard.v1", "calmBreakBoard.v2"];
+    const STORAGE_KEY = "calmBreakBoard.v4";
+    const LEGACY_KEYS = ["calmBreakBoard.v1", "calmBreakBoard.v2", "calmBreakBoard.v3"];
     const DEFAULT_SHEET = "https://docs.google.com/spreadsheets/d/177Y85ttjaTahQyNXvkD7Lve9SBqqCvxt8FrFTyagKEM/edit?usp=sharing";
     const DEFAULT_STUDENT_COUNT = 25;
+    const POLL_MS = 3000;
     const DAY_LABELS = { 1: "週一", 2: "週二", 3: "週三", 4: "週四", 5: "週五" };
     const PERIODS = [
       { id: "cleaning", label: "打掃時間", start: "07:35", end: "07:50" },
@@ -802,79 +769,14 @@
       { id: "p6", label: "第六節", start: "14:10", end: "14:50" },
       { id: "p7", label: "第七節", start: "15:10", end: "15:50" }
     ];
-    const SCRIPT_SAMPLE = `const SEAT_COLUMN = 1;
-const NAME_COLUMN = 2;
-const HEADER_ROW = 1;
-const FIRST_STUDENT_ROW = 2;
-const FIRST_ASSIGNMENT_COLUMN = 3;
-const RED_COLORS = ["#ff0000", "#ea4335", "rgb(255, 0, 0)"];
+    const SCRIPT_HELP = `Apps Script 已改為 API 版本，請使用本專案 apps-script.gs。
 
-function doGet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const bySeat = {};
+支援 API：
+- getStatus
+- updateStatus
+- updateAllStatus
 
-  ss.getSheets().forEach(sheet => {
-    const sheetName = sheet.getName();
-    const range = sheet.getDataRange();
-    const values = range.getDisplayValues();
-    const backgrounds = range.getBackgrounds();
-    if (!values.length) return;
-
-    const headers = values[HEADER_ROW - 1] || [];
-    for (let r = FIRST_STUDENT_ROW - 1; r < values.length; r++) {
-      const seat = String(values[r][SEAT_COLUMN - 1] || "").trim();
-      if (!isStudentSeat(seat)) continue;
-
-      const rawName = String(values[r][NAME_COLUMN - 1] || "").trim();
-      if (!rawName) continue;
-      const studentNumber = Number(seat) || r;
-      const displayName = rawName ? seat + "號 " + rawName : seat + "號";
-      if (!bySeat[seat]) bySeat[seat] = { seat, studentNumber, name: displayName, calm: false, missing: [] };
-
-      for (let c = FIRST_ASSIGNMENT_COLUMN - 1; c < backgrounds[r].length; c++) {
-        if (!isRedCellColor(backgrounds[r][c])) continue;
-        bySeat[seat].calm = true;
-        bySeat[seat].missing.push(titleForCell(headers, c, sheetName));
-      }
-    }
-  });
-
-  const students = Object.values(bySeat)
-    .sort((a, b) => a.studentNumber - b.studentNumber)
-    .map(student => ({
-      seat: student.seat,
-      name: student.name,
-      calm: student.calm,
-      missing: [...new Set(student.missing)]
-    }));
-
-  return ContentService
-    .createTextOutput(JSON.stringify({ ok: true, updatedAt: new Date().toISOString(), students }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function titleForCell(headers, col, sheetName) {
-  const header = String(headers[col] || "").trim();
-  return sheetName + "：" + (header || "未命名作業");
-}
-
-function isRedCellColor(color) {
-  const value = String(color || "").trim().toLowerCase();
-  if (RED_COLORS.includes(value)) return true;
-  const hex = value.match(/^#([0-9a-f]{6})$/);
-  if (hex) return isStrictRed(parseInt(hex[1].slice(0, 2), 16), parseInt(hex[1].slice(2, 4), 16), parseInt(hex[1].slice(4, 6), 16));
-  const rgb = value.match(/^rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/);
-  if (rgb) return isStrictRed(Number(rgb[1]), Number(rgb[2]), Number(rgb[3]));
-  return false;
-}
-
-function isStrictRed(r, g, b) {
-  return r >= 220 && g <= 85 && b <= 85 && r > g * 2.4 && r > b * 2.4;
-}
-
-function isStudentSeat(value) {
-  return /^\\d+$/.test(String(value || "").trim());
-}`;
+狀態會寫入試算表中的 _下課狀態 隱藏頁籤。`;
 
     const els = {
       appMessage: document.getElementById("appMessage"),
@@ -899,7 +801,6 @@ function isStudentSeat(value) {
       sheetUrl: document.getElementById("sheetUrl"),
       scriptUrl: document.getElementById("scriptUrl"),
       studentCount: document.getElementById("studentCount"),
-      syncMinutes: document.getElementById("syncMinutes"),
       syncNow: document.getElementById("syncNow"),
       clearManual: document.getElementById("clearManual"),
       calmAll: document.getElementById("calmAll"),
@@ -911,24 +812,24 @@ function isStudentSeat(value) {
     };
 
     let state = loadState();
-    let syncTimer = null;
+    let pollTimer = null;
+    let polling = false;
+    let localEditUntil = 0;
+    let lastSignature = "";
     let editingDay = normalizedWeekday(new Date().getDay());
 
     boot();
 
     function boot() {
-      els.scriptCode.textContent = SCRIPT_SAMPLE;
+      els.scriptCode.textContent = SCRIPT_HELP;
       bindEvents();
       render();
       hydrateSettings();
       startClock();
-      scheduleSync();
+      startPolling();
       if (location.protocol === "file:") {
-        showMessage("請不要直接雙擊 index.html，請使用 localhost 或 Live Server 開啟。同步 Google 資料時，file:// 很容易被瀏覽器擋住。", "warn", true);
+        showMessage("請不要直接雙擊 index.html，請使用 localhost、Live Server 或 GitHub Pages 開啟。", "warn", true);
       }
-      window.addEventListener("error", event => {
-        showMessage(`畫面發生錯誤：${event.message || "請重新整理後再試"}`, "error", true);
-      });
     }
 
     function bindEvents() {
@@ -940,39 +841,28 @@ function isStudentSeat(value) {
         collectSettings();
         saveState();
         render();
-        scheduleSync();
+        startPolling();
         els.dialog.close();
       });
-      els.syncNow.addEventListener("click", async () => {
-        collectSettings();
-        await syncFromSource();
-        hydrateSettings();
-      });
+      els.syncNow.addEventListener("click", () => fetchData({ force: true, visible: true }));
       els.clearManual.addEventListener("click", () => {
-        state.students.forEach(student => student.manual = null);
-        saveState();
-        render();
-        hydrateSettings();
+        localStorage.removeItem(STORAGE_KEY);
+        showMessage("已清除本機快取。遠端狀態不會被清除。", "ok", false);
       });
-      els.calmAll.addEventListener("click", () => {
-        state.classCalm = !state.classCalm;
-        saveState();
-        render();
-        hydrateSettings();
-      });
+      els.calmAll.addEventListener("click", toggleClassCalm);
       els.fullScreen.addEventListener("click", () => {
         if (els.dialog.open) els.dialog.close();
         document.documentElement.requestFullscreen?.();
       });
       els.resetAll.addEventListener("click", () => {
-        if (!confirm("確定要重設全部資料？")) return;
-        safeRemove(STORAGE_KEY);
-        LEGACY_KEYS.forEach(safeRemove);
+        if (!confirm("確定要重設本機設定？遠端 Google Sheet 狀態不會被清除。")) return;
+        localStorage.removeItem(STORAGE_KEY);
+        LEGACY_KEYS.forEach(key => localStorage.removeItem(key));
         state = defaultState();
         saveState();
         render();
         hydrateSettings();
-        scheduleSync();
+        startPolling();
       });
     }
 
@@ -982,9 +872,8 @@ function isStudentSeat(value) {
         scriptUrl: "",
         studentCount: DEFAULT_STUDENT_COUNT,
         classCalm: false,
-        syncMinutes: "0",
-        periods: PERIODS,
         students: buildStudents(DEFAULT_STUDENT_COUNT),
+        periods: PERIODS,
         weekly: buildNoticeMap({
           morning: ["先整理座位與心情，準備開始一天。"],
           lunch: ["先洗手、安靜排隊，謝謝午餐服務同學。"],
@@ -996,28 +885,28 @@ function isStudentSeat(value) {
     }
 
     function loadState() {
-      const saved = safeGet(STORAGE_KEY);
-      if (saved) {
-        try { return normalizeState(JSON.parse(saved)); } catch (_) {}
-      }
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) return normalizeState(JSON.parse(saved));
+      } catch (_) {}
       return defaultState();
     }
 
     function normalizeState(input) {
       const count = clampStudentCount(input.studentCount || input.students?.length || DEFAULT_STUDENT_COUNT);
       const students = Array.isArray(input.students) ? input.students.slice(0, count) : [];
-      while (students.length < count) students.push({ name: `${students.length + 1}號`, calm: false, manual: null, missing: [] });
+      while (students.length < count) students.push(defaultStudent(students.length + 1));
       return {
         sheetUrl: input.sheetUrl || DEFAULT_SHEET,
         scriptUrl: input.scriptUrl || "",
         studentCount: count,
         classCalm: Boolean(input.classCalm),
-        syncMinutes: String(input.syncMinutes ?? "0"),
         periods: normalizePeriods(input.periods),
         students: students.map((student, index) => ({
+          seat: String(student.seat || index + 1),
           name: String(student.name || `${index + 1}號`).trim(),
           calm: Boolean(student.calm),
-          manual: student.manual === true ? true : student.manual === false ? false : null,
+          manualStatus: normalizeManualStatus(student.manualStatus || (student.manual === true ? "calm" : student.manual === false ? "ok" : "auto")),
           missing: normalizeMissing(student.missing || student.note)
         })),
         weekly: normalizeNoticeMap(input.weekly),
@@ -1026,8 +915,12 @@ function isStudentSeat(value) {
       };
     }
 
+    function defaultStudent(index) {
+      return { seat: String(index), name: `${index}號`, calm: false, manualStatus: "auto", missing: [] };
+    }
+
     function buildStudents(count) {
-      return Array.from({ length: count }, (_, index) => ({ name: `${index + 1}號`, calm: false, manual: null, missing: [] }));
+      return Array.from({ length: count }, (_, index) => defaultStudent(index + 1));
     }
 
     function normalizePeriods(periods) {
@@ -1051,41 +944,23 @@ function isStudentSeat(value) {
       if (!input || typeof input !== "object") return map;
       for (let day = 1; day <= 5; day++) {
         const dayData = input[day] || {};
-        if (Array.isArray(dayData)) {
-          map[day].morning = dayData;
-        } else {
-          PERIODS.forEach(period => {
-            map[day][period.id] = splitLines(Array.isArray(dayData[period.id]) ? dayData[period.id].join("\n") : dayData[period.id] || "");
-          });
-        }
+        PERIODS.forEach(period => {
+          map[day][period.id] = splitLines(Array.isArray(dayData[period.id]) ? dayData[period.id].join("\n") : dayData[period.id] || "");
+        });
       }
       return map;
-    }
-
-    function normalizeMissing(value) {
-      if (Array.isArray(value)) return value.map(item => String(item).trim()).filter(Boolean);
-      return splitLines(String(value || "").replace(/[、,，]/g, "\n"));
     }
 
     function saveState() {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       } catch (_) {
-        showMessage("設定無法儲存，可能是瀏覽器封鎖 localStorage。請換用 localhost 開啟。", "error", true);
+        showMessage("本機快取無法儲存，但遠端同步仍可使用。", "warn", false);
       }
     }
 
-    function safeGet(key) {
-      try { return localStorage.getItem(key); } catch (_) { return null; }
-    }
-
-    function safeRemove(key) {
-      try { localStorage.removeItem(key); } catch (_) {}
-    }
-
     function currentCalm(student) {
-      if (state.classCalm) return true;
-      return student.manual === null ? student.calm : student.manual;
+      return state.classCalm || student.missing.length > 0 || student.manualStatus === "calm" || student.calm;
     }
 
     function render() {
@@ -1100,12 +975,14 @@ function isStudentSeat(value) {
       els.board.innerHTML = "";
       els.calmAll.textContent = state.classCalm ? "取消冷靜" : "全班冷靜";
       els.calmAll.classList.toggle("calm-all", !state.classCalm);
+
       let calmCount = 0;
       state.students.forEach(student => {
         const isCalm = currentCalm(student);
+        const hasMissing = student.missing.length > 0;
         if (isCalm) calmCount++;
         const card = document.createElement("article");
-        card.className = `student${isCalm ? " calm" : ""}${student.manual !== null ? " manual" : ""}`;
+        card.className = `student${isCalm ? " calm" : ""}${hasMissing ? " missing" : ""}${student.manualStatus !== "auto" ? " manual" : ""}`;
         const nameClass = student.name.length >= 9 ? "extra-long-name" : student.name.length >= 6 ? "long-name" : "";
         card.innerHTML = `
           <button type="button" class="student-toggle" title="點一下可手動切換狀態">
@@ -1116,21 +993,12 @@ function isStudentSeat(value) {
             <button type="button" class="work-btn">${student.missing.length ? `作業 ${student.missing.length}` : "作業"}</button>
           </div>
         `;
-        card.querySelector(".student-toggle").addEventListener("click", () => {
-          student.manual = !isCalm;
-          saveState();
-          render();
-          hydrateSettings();
-        });
-        card.querySelector(".status").addEventListener("click", () => {
-          student.manual = !isCalm;
-          saveState();
-          render();
-          hydrateSettings();
-        });
+        card.querySelector(".student-toggle").addEventListener("click", () => toggleStudent(student));
+        card.querySelector(".status").addEventListener("click", () => toggleStudent(student));
         card.querySelector(".work-btn").addEventListener("click", () => showMissing(student));
         els.board.appendChild(card);
       });
+
       if (state.classCalm) {
         const overlay = document.createElement("div");
         overlay.className = "class-calm-overlay";
@@ -1144,7 +1012,7 @@ function isStudentSeat(value) {
     function showMissing(student) {
       els.missingTitle.textContent = `${student.name} 未交作業`;
       els.missingList.innerHTML = "";
-      const items = student.missing.length ? student.missing : [currentCalm(student) ? "目前為手動或同步冷靜，沒有作業標題資料。" : "目前沒有未交作業。"];
+      const items = student.missing.length ? student.missing : [currentCalm(student) ? "目前為冷靜狀態，沒有未交作業標題。" : "目前沒有未交作業。"];
       items.forEach(item => {
         const li = document.createElement("li");
         li.textContent = item;
@@ -1193,7 +1061,6 @@ function isStudentSeat(value) {
       els.sheetUrl.value = state.sheetUrl;
       els.scriptUrl.value = state.scriptUrl;
       els.studentCount.value = state.studentCount;
-      els.syncMinutes.value = state.syncMinutes;
       renderPeriodEditor();
       renderDayTabs();
       renderNoticeEditor();
@@ -1249,31 +1116,20 @@ function isStudentSeat(value) {
 
     function renderStudentEditor() {
       els.editor.innerHTML = "";
-      state.students.forEach((student, index) => {
+      state.students.forEach(student => {
         const card = document.createElement("div");
         card.className = "edit-card";
         card.innerHTML = `
-          <input value="${escapeAttribute(student.name)}" aria-label="學生姓名">
+          <input value="${escapeAttribute(student.name)}" aria-label="學生姓名" readonly>
           <div class="seg">
-            <button type="button" data-mode="auto" class="${student.manual === null ? "active" : ""}">同步</button>
-            <button type="button" data-mode="ok" class="${student.manual === false ? "active" : ""}">可下課</button>
-            <button type="button" data-mode="calm" class="${student.manual === true ? "active" : ""}">冷靜</button>
+            <button type="button" data-mode="auto" class="${student.manualStatus === "auto" ? "active" : ""}">同步</button>
+            <button type="button" data-mode="ok" class="${student.manualStatus === "ok" ? "active" : ""}">可下課</button>
+            <button type="button" data-mode="calm" class="${student.manualStatus === "calm" ? "active" : ""}">冷靜</button>
           </div>
           <div class="sync-state">${escapeHtml(student.missing.join("、") || "無未交標題")}</div>
         `;
-        card.querySelector("input").addEventListener("input", event => {
-          state.students[index].name = event.target.value;
-          saveState();
-          render();
-        });
         card.querySelectorAll("button").forEach(button => {
-          button.addEventListener("click", () => {
-            const mode = button.dataset.mode;
-            state.students[index].manual = mode === "auto" ? null : mode === "calm";
-            saveState();
-            render();
-            hydrateSettings();
-          });
+          button.addEventListener("click", () => updateStudentStatus(student, button.dataset.mode));
         });
         els.editor.appendChild(card);
       });
@@ -1282,7 +1138,6 @@ function isStudentSeat(value) {
     function collectSettings() {
       state.sheetUrl = els.sheetUrl.value.trim();
       state.scriptUrl = els.scriptUrl.value.trim();
-      state.syncMinutes = els.syncMinutes.value;
       resizeStudents(clampStudentCount(els.studentCount.value));
       state.periods.forEach(period => {
         const labelInput = els.periodEditor.querySelector(`[data-period-label="${period.id}"]`);
@@ -1304,130 +1159,161 @@ function isStudentSeat(value) {
 
     function resizeStudents(count) {
       state.studentCount = count;
-      while (state.students.length < count) state.students.push({ name: `${state.students.length + 1}號`, calm: false, manual: null, missing: [] });
+      while (state.students.length < count) state.students.push(defaultStudent(state.students.length + 1));
       state.students = state.students.slice(0, count);
     }
 
-    async function syncFromSource() {
-      if (location.protocol === "file:") {
-        showMessage("請不要直接雙擊 index.html，請使用 localhost 或 Live Server 開啟。", "warn", true);
+    async function toggleStudent(student) {
+      const next = currentCalm(student) && student.missing.length === 0 ? "ok" : "calm";
+      await updateStudentStatus(student, next);
+    }
+
+    async function updateStudentStatus(student, status) {
+      if (!student.seat) return showMessage("此學生沒有座號，無法同步狀態。", "error", true);
+      localEditUntil = Date.now() + 1600;
+      student.manualStatus = normalizeManualStatus(status);
+      saveState();
+      render();
+      hydrateSettings();
+      try {
+        await callAppsScript("updateStatus", { seat: student.seat, status: student.manualStatus });
+        await fetchData({ force: true });
+      } catch (error) {
+        showMessage(friendlySyncError(error), "error", true);
+      }
+    }
+
+    async function toggleClassCalm() {
+      localEditUntil = Date.now() + 1600;
+      state.classCalm = !state.classCalm;
+      saveState();
+      render();
+      try {
+        await callAppsScript("updateAllStatus", { classCalm: state.classCalm ? "true" : "false" });
+        await fetchData({ force: true });
+      } catch (error) {
+        showMessage(friendlySyncError(error), "error", true);
+      }
+    }
+
+    function startPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(() => fetchData(), POLL_MS);
+      fetchData({ force: true, visible: false });
+    }
+
+    async function fetchData(options = {}) {
+      if (polling) return;
+      if (!options.force && Date.now() < localEditUntil) return;
+      if (!state.scriptUrl) {
+        renderSyncText("尚未設定 Apps Script，現在只顯示本機快取。");
         return;
       }
-      els.syncHelp.textContent = "同步中...";
-      showMessage("正在同步資料...", "ok", false);
+      if (location.protocol === "file:") {
+        showMessage("請使用 localhost、Live Server 或 GitHub Pages 開啟，file:// 不能穩定同步。", "warn", true);
+        return;
+      }
+
+      polling = true;
+      if (options.visible) renderSyncText("同步中...");
       try {
-        const data = state.scriptUrl ? await fetchAppsScript(state.scriptUrl) : await fetchSheetValues(state.sheetUrl);
-        applySyncData(data);
-        state.lastSync = new Date().toISOString();
+        const data = await callAppsScript("getStatus");
+        applyRemoteData(data);
         saveState();
-        render();
-        els.syncHelp.textContent = "同步完成。";
-        showMessage("同步完成。", "ok", false);
       } catch (error) {
-        const message = friendlySyncError(error);
-        els.syncHelp.textContent = message;
-        renderSyncText("同步失敗，仍可手動調整。");
-        showMessage(message, "error", true);
+        if (options.visible) showMessage(friendlySyncError(error), "error", true);
+        renderSyncText("同步失敗，顯示本機快取。");
+      } finally {
+        polling = false;
       }
     }
 
-    async function fetchAppsScript(url) {
+    async function callAppsScript(action, params = {}) {
+      const url = state.scriptUrl.trim();
       if (!/^https:\/\/script\.google\.com\/macros\/s\//.test(url)) {
-        throw new SyncError("APPS_SCRIPT_URL", "Apps Script 網址看起來不正確，請貼上部署後的「網頁應用程式」網址。");
+        throw new SyncError("APPS_SCRIPT_URL", "Apps Script 網址看起來不正確，請貼上部署後的網頁應用程式網址。");
       }
-      let response;
+      const query = new URLSearchParams({ action, ...params, t: String(Date.now()) });
+      const endpoint = `${url}${url.includes("?") ? "&" : "?"}${query.toString()}`;
       try {
-        response = await fetch(url, { method: "GET", cache: "no-store" });
+        const response = await fetch(endpoint, { method: "GET", cache: "no-store" });
+        if (!response.ok) throw new SyncError("APPS_SCRIPT_HTTP", `Apps Script 回應錯誤 ${response.status}。`);
+        return await response.json();
       } catch (error) {
-        throw new SyncError("NETWORK_OR_CORS", "連不到 Apps Script。可能是網路中斷，或瀏覽器被 CORS 擋住。", error);
-      }
-      if (!response.ok) {
-        throw new SyncError("APPS_SCRIPT_HTTP", `Apps Script 回應錯誤 ${response.status}。請確認部署權限是「任何知道連結的人」。`);
-      }
-      const text = await response.text();
-      try {
-        return JSON.parse(text);
-      } catch (error) {
-        throw new SyncError("NOT_JSON", "Apps Script 回傳的不是 JSON。請確認部署的是本專案提供的 Apps Script 程式碼。", error);
+        if (error instanceof SyncError) throw error;
+        return jsonp(endpoint);
       }
     }
 
-    function fetchSheetValues(url) {
-      const id = extractSheetId(url);
-      if (!id) throw new SyncError("SHEET_URL", "Google 試算表網址格式不正確。請貼上完整的 Google Sheets 連結。");
+    function jsonp(endpoint) {
       return new Promise((resolve, reject) => {
-        const callback = `sheetCallback_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        const callback = `boardCallback_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
         const script = document.createElement("script");
         const timer = setTimeout(() => {
           cleanup();
-          reject(new SyncError("SHEET_TIMEOUT", "讀取 Google 試算表逾時。請確認試算表已公開，或改用 Apps Script 同步。"));
+          reject(new SyncError("JSONP_TIMEOUT", "Apps Script 連線逾時，請確認部署權限。"));
         }, 12000);
-
-        window[callback] = payload => {
+        window[callback] = data => {
           cleanup();
-          const rows = payload?.table?.rows;
-          if (!Array.isArray(rows)) {
-            reject(new SyncError("SHEET_PRIVATE", "Google 試算表沒有公開，或資料格式不符合。請確認分享權限。"));
-            return;
-          }
-          const values = rows.map(row => (row.c || []).map(cell => cell?.f ?? cell?.v ?? ""));
-          resolve({ values });
+          resolve(data);
         };
-
         function cleanup() {
           clearTimeout(timer);
           delete window[callback];
           script.remove();
         }
-
         script.onerror = () => {
           cleanup();
-          reject(new SyncError("SHEET_NETWORK", "無法連到 Google 試算表。可能是網路問題、試算表未公開，或瀏覽器阻擋。"));
+          reject(new SyncError("NETWORK_OR_CORS", "連不到 Apps Script，可能是網路或部署權限問題。"));
         };
-
-        script.src = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=responseHandler:${callback};out:json`;
+        script.src = `${endpoint}&callback=${callback}`;
         document.head.appendChild(script);
       });
     }
 
-    function applySyncData(data) {
-      const incoming = Array.isArray(data?.students) ? data.students : valuesToStudents(data?.values || []);
-      if (!incoming.length) throw new SyncError("BAD_DATA", "同步成功，但沒有讀到學生資料。請確認 A 欄座號、B 欄姓名，且第 2 列開始是學生。");
-      resizeStudents(Math.max(state.studentCount, incoming.length));
-      incoming.slice(0, state.studentCount).forEach((item, index) => {
-        const existing = state.students[index] || {};
-        state.students[index] = {
-          name: String(item.name || existing.name || `${index + 1}號`).trim(),
-          calm: Boolean(item.calm || item.missing?.length),
-          manual: existing.manual === true ? true : existing.manual === false ? false : null,
-          missing: normalizeMissing(item.missing || "")
-        };
-      });
-    }
+    function applyRemoteData(data) {
+      if (!data || data.ok === false) throw new SyncError(data?.error || "BAD_DATA", data?.message || "Apps Script 回傳資料格式不正確。");
+      if (!Array.isArray(data.students)) throw new SyncError("BAD_DATA", "Apps Script 沒有回傳 students 陣列。");
 
-    function valuesToStudents(values) {
-      const headers = values[0] || [];
-      return values.slice(1).map(row => {
-        const seat = String(row[0] || "").trim();
-        const rawName = String(row[1] || "").trim();
-        if (!isStudentSeat(seat) || !rawName) return null;
-        const name = `${seat}號 ${rawName}`;
-        return { name, calm: false, missing: [] };
-      }).filter(Boolean);
+      const nextStudents = data.students.map((student, index) => ({
+        seat: String(student.seat || index + 1),
+        name: String(student.name || `${index + 1}號`).trim(),
+        calm: Boolean(student.calm),
+        manualStatus: normalizeManualStatus(student.manualStatus),
+        missing: normalizeMissing(student.missing)
+      }));
+      const nextState = {
+        ...state,
+        classCalm: Boolean(data.classCalm),
+        studentCount: nextStudents.length || state.studentCount,
+        students: nextStudents.length ? nextStudents : state.students,
+        lastSync: data.updatedAt || new Date().toISOString()
+      };
+      const signature = JSON.stringify({
+        classCalm: nextState.classCalm,
+        students: nextState.students.map(s => [s.seat, s.name, s.calm, s.manualStatus, s.missing])
+      });
+      state = normalizeState(nextState);
+      if (signature !== lastSignature) {
+        lastSignature = signature;
+        render();
+        if (!els.dialog.open) hydrateSettings();
+      } else {
+        renderSyncText();
+      }
     }
 
     function friendlySyncError(error) {
       if (error instanceof SyncError) return error.message;
-      if (String(error?.message || "").includes("Failed to fetch")) return "網路失敗或 CORS 被擋。請確認使用 localhost 開啟，並確認 Apps Script 已部署成網頁應用程式。";
-      return `同步失敗：${error?.message || "請檢查網路、權限與 Apps Script 網址。"}`;
+      if (String(error?.message || "").includes("Failed to fetch")) return "網路失敗或 CORS 被擋，已改用備援方式同步。";
+      return `同步失敗：${error?.message || "請檢查 Apps Script 網址與部署權限。"}`;
     }
 
     class SyncError extends Error {
-      constructor(code, message, cause) {
+      constructor(code, message) {
         super(message);
         this.name = "SyncError";
         this.code = code;
-        this.cause = cause;
       }
     }
 
@@ -1435,8 +1321,8 @@ function isStudentSeat(value) {
       els.appMessage.textContent = text;
       els.appMessage.className = `message show ${type}`;
       if (!sticky) {
-        window.clearTimeout(showMessage.timer);
-        showMessage.timer = window.setTimeout(() => {
+        clearTimeout(showMessage.timer);
+        showMessage.timer = setTimeout(() => {
           els.appMessage.className = "message";
           els.appMessage.textContent = "";
         }, 4500);
@@ -1447,20 +1333,25 @@ function isStudentSeat(value) {
       return String(value || "").split(/\n/).map(line => line.trim()).filter(Boolean);
     }
 
-    function extractSheetId(url) {
-      const match = String(url || "").match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-      return match ? match[1] : "";
+    function normalizeMissing(value) {
+      if (Array.isArray(value)) return value.map(item => String(item).trim()).filter(Boolean);
+      return splitLines(String(value || "").replace(/[、,，]/g, "\n"));
     }
 
-    function isStudentSeat(value) {
-      return /^\d+$/.test(String(value || "").trim());
+    function normalizeManualStatus(value) {
+      const status = String(value || "auto").trim();
+      return ["auto", "ok", "calm"].includes(status) ? status : "auto";
     }
 
-    function scheduleSync() {
-      if (syncTimer) clearInterval(syncTimer);
-      const minutes = Number(state.syncMinutes);
-      if (!minutes) return;
-      syncTimer = setInterval(syncFromSource, minutes * 60 * 1000);
+    function currentPeriod(date) {
+      const minute = date.getHours() * 60 + date.getMinutes();
+      const found = state.periods.find(period => minute >= toMinutes(period.start) && minute <= toMinutes(period.end));
+      return found || state.periods.find(period => minute < toMinutes(period.start)) || state.periods[state.periods.length - 1];
+    }
+
+    function toMinutes(value) {
+      const [hour, minute] = String(value || "00:00").split(":").map(Number);
+      return hour * 60 + minute;
     }
 
     function startClock() {
@@ -1473,17 +1364,6 @@ function isStudentSeat(value) {
       els.timeNow.textContent = now.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false });
       els.dateNow.textContent = now.toLocaleDateString("zh-TW", { month: "long", day: "numeric", weekday: "long" });
       renderNotices();
-    }
-
-    function currentPeriod(date) {
-      const minute = date.getHours() * 60 + date.getMinutes();
-      const found = state.periods.find(period => minute >= toMinutes(period.start) && minute <= toMinutes(period.end));
-      return found || state.periods.find(period => minute < toMinutes(period.start)) || state.periods[state.periods.length - 1];
-    }
-
-    function toMinutes(value) {
-      const [hour, minute] = String(value || "00:00").split(":").map(Number);
-      return hour * 60 + minute;
     }
 
     function normalizedWeekday(day) {
