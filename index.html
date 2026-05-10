@@ -776,7 +776,9 @@
 - updateStatus
 - updateAllStatus
 
-狀態會寫入試算表中的 _下課狀態 隱藏頁籤。`;
+狀態會寫入試算表中的 _下課狀態 隱藏頁籤。
+狀態頁籤欄位：seat、status、updatedAt。
+status 使用 auto / free / calm。`;
 
     const els = {
       appMessage: document.getElementById("appMessage"),
@@ -906,7 +908,7 @@
           seat: String(student.seat || index + 1),
           name: String(student.name || `${index + 1}號`).trim(),
           calm: Boolean(student.calm),
-          manualStatus: normalizeManualStatus(student.manualStatus || (student.manual === true ? "calm" : student.manual === false ? "ok" : "auto")),
+          manualStatus: normalizeManualStatus(student.manualStatus || (student.manual === true ? "calm" : student.manual === false ? "free" : "auto")),
           missing: normalizeMissing(student.missing || student.note)
         })),
         weekly: normalizeNoticeMap(input.weekly),
@@ -959,8 +961,21 @@
       }
     }
 
-    function currentCalm(student) {
-      return state.classCalm || student.missing.length > 0 || student.manualStatus === "calm" || student.calm;
+    function isManualCalm(student) {
+      return normalizeManualStatus(student.manualStatus) === "calm";
+    }
+
+    function isManualFree(student) {
+      return normalizeManualStatus(student.manualStatus) === "free";
+    }
+
+    function hasMissing(student) {
+      return normalizeMissing(student.missing).length > 0;
+    }
+
+    function isRedStudent(student) {
+      if (isManualFree(student)) return false;
+      return state.classCalm || isManualCalm(student) || (normalizeManualStatus(student.manualStatus) === "auto" && hasMissing(student));
     }
 
     function render() {
@@ -978,18 +993,18 @@
 
       let calmCount = 0;
       state.students.forEach(student => {
-        const isCalm = currentCalm(student);
-        const hasMissing = student.missing.length > 0;
-        if (isCalm) calmCount++;
+        const isRed = isRedStudent(student);
+        const missing = hasMissing(student);
+        if (isRed) calmCount++;
         const card = document.createElement("article");
-        card.className = `student${isCalm ? " calm" : ""}${hasMissing ? " missing" : ""}${student.manualStatus !== "auto" ? " manual" : ""}`;
+        card.className = `student${isRed ? " calm" : ""}${missing && !isManualFree(student) ? " missing" : ""}${student.manualStatus !== "auto" ? " manual" : ""}`;
         const nameClass = student.name.length >= 9 ? "extra-long-name" : student.name.length >= 6 ? "long-name" : "";
         card.innerHTML = `
           <button type="button" class="student-toggle" title="點一下可手動切換狀態">
             <div class="student-name ${nameClass}">${escapeHtml(student.name)}</div>
           </button>
           <div class="student-actions">
-            <button type="button" class="status">${isCalm ? "下課冷靜" : "可以下課"}</button>
+            <button type="button" class="status">${isRed ? "下課冷靜" : "可以下課"}</button>
             <button type="button" class="work-btn">${student.missing.length ? `作業 ${student.missing.length}` : "作業"}</button>
           </div>
         `;
@@ -1012,7 +1027,7 @@
     function showMissing(student) {
       els.missingTitle.textContent = `${student.name} 未交作業`;
       els.missingList.innerHTML = "";
-      const items = student.missing.length ? student.missing : [currentCalm(student) ? "目前為冷靜狀態，沒有未交作業標題。" : "目前沒有未交作業。"];
+      const items = student.missing.length ? student.missing : [isRedStudent(student) ? "目前為冷靜狀態，沒有未交作業標題。" : "目前沒有未交作業。"];
       items.forEach(item => {
         const li = document.createElement("li");
         li.textContent = item;
@@ -1123,7 +1138,7 @@
           <input value="${escapeAttribute(student.name)}" aria-label="學生姓名" readonly>
           <div class="seg">
             <button type="button" data-mode="auto" class="${student.manualStatus === "auto" ? "active" : ""}">同步</button>
-            <button type="button" data-mode="ok" class="${student.manualStatus === "ok" ? "active" : ""}">可下課</button>
+            <button type="button" data-mode="free" class="${student.manualStatus === "free" ? "active" : ""}">可下課</button>
             <button type="button" data-mode="calm" class="${student.manualStatus === "calm" ? "active" : ""}">冷靜</button>
           </div>
           <div class="sync-state">${escapeHtml(student.missing.join("、") || "無未交標題")}</div>
@@ -1164,7 +1179,7 @@
     }
 
     async function toggleStudent(student) {
-      const next = currentCalm(student) && student.missing.length === 0 ? "ok" : "calm";
+      const next = isRedStudent(student) ? "free" : "calm";
       await updateStudentStatus(student, next);
     }
 
@@ -1278,7 +1293,7 @@
       const nextStudents = data.students.map((student, index) => ({
         seat: String(student.seat || index + 1),
         name: String(student.name || `${index + 1}號`).trim(),
-        calm: Boolean(student.calm),
+        calm: normalizeManualStatus(student.manualStatus) === "calm",
         manualStatus: normalizeManualStatus(student.manualStatus),
         missing: normalizeMissing(student.missing)
       }));
@@ -1291,7 +1306,7 @@
       };
       const signature = JSON.stringify({
         classCalm: nextState.classCalm,
-        students: nextState.students.map(s => [s.seat, s.name, s.calm, s.manualStatus, s.missing])
+        students: nextState.students.map(s => [s.seat, s.name, s.manualStatus, s.missing])
       });
       state = normalizeState(nextState);
       if (signature !== lastSignature) {
@@ -1340,7 +1355,8 @@
 
     function normalizeManualStatus(value) {
       const status = String(value || "auto").trim();
-      return ["auto", "ok", "calm"].includes(status) ? status : "auto";
+      if (status === "ok") return "free";
+      return ["auto", "free", "calm"].includes(status) ? status : "auto";
     }
 
     function currentPeriod(date) {

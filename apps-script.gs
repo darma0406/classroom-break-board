@@ -42,13 +42,12 @@ function getStatus() {
 
   const students = scanned.students.map(student => {
     const manualStatus = manual.students[student.seat] || "auto";
-    const hasMissing = student.missing.length > 0;
     return {
       seat: student.seat,
       name: student.name,
       manualStatus,
       missing: student.missing,
-      calm: classCalm || hasMissing || manualStatus === "calm"
+      calm: manualStatus === "calm"
     };
   });
 
@@ -69,38 +68,44 @@ function updateStatus(params) {
   }
 
   const sheet = ensureStatusSheet();
-  const row = findRow(sheet, "student", seat);
+  const row = findSeatRow(sheet, seat);
   if (row) {
-    sheet.getRange(row, 3, 1, 2).setValues([[status, new Date()]]);
+    sheet.getRange(row, 1, 1, 3).setValues([[seat, status, new Date()]]);
   } else {
-    sheet.appendRow(["student", seat, status, new Date()]);
+    sheet.appendRow([seat, status, new Date()]);
   }
+  removeDuplicateSeatRows(sheet, seat, row || sheet.getLastRow());
   return getStatus();
 }
 
 function updateAllStatus(params) {
   const classCalm = parseBoolean(params.classCalm);
-  const sheet = ensureStatusSheet();
-  const row = findRow(sheet, "meta", "classCalm");
-  if (row) {
-    sheet.getRange(row, 3, 1, 2).setValues([[classCalm ? "true" : "false", new Date()]]);
-  } else {
-    sheet.appendRow(["meta", "classCalm", classCalm ? "true" : "false", new Date()]);
-  }
+  const props = PropertiesService.getDocumentProperties();
+  props.setProperty("classCalm", classCalm ? "true" : "false");
+  props.setProperty("classCalmUpdatedAt", new Date().toISOString());
   return getStatus();
 }
 
 function readStatusStore() {
   const sheet = ensureStatusSheet();
   const values = sheet.getDataRange().getDisplayValues();
-  const store = { classCalm: false, students: {} };
+  const props = PropertiesService.getDocumentProperties();
+  const store = { classCalm: parseBoolean(props.getProperty("classCalm")), students: {} };
 
   for (let r = 1; r < values.length; r++) {
-    const type = values[r][0];
-    const key = values[r][1];
-    const value = values[r][2];
-    if (type === "meta" && key === "classCalm") store.classCalm = parseBoolean(value);
-    if (type === "student" && isStudentSeat(key)) store.students[key] = normalizeManualStatus(value);
+    const first = values[r][0];
+    const second = values[r][1];
+    const third = values[r][2];
+
+    if (first === "meta" && second === "classCalm") {
+      store.classCalm = parseBoolean(third);
+      continue;
+    }
+    if (first === "student" && isStudentSeat(second)) {
+      store.students[second] = normalizeManualStatus(third);
+      continue;
+    }
+    if (isStudentSeat(first)) store.students[first] = normalizeManualStatus(second);
   }
   return store;
 }
@@ -111,17 +116,39 @@ function ensureStatusSheet() {
   if (!sheet) {
     sheet = ss.insertSheet(STATUS_SHEET_NAME);
     sheet.hideSheet();
-    sheet.appendRow(["type", "key", "value", "updatedAt"]);
+    sheet.appendRow(["seat", "status", "updatedAt"]);
+  } else {
+    normalizeStatusSheetHeader(sheet);
   }
   return sheet;
 }
 
-function findRow(sheet, type, key) {
+function normalizeStatusSheetHeader(sheet) {
+  const header = sheet.getRange(1, 1, 1, Math.max(3, sheet.getLastColumn())).getDisplayValues()[0];
+  if (header[0] === "seat" && header[1] === "status" && header[2] === "updatedAt") return;
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(["seat", "status", "updatedAt"]);
+    return;
+  }
+  sheet.getRange(1, 1, 1, 3).setValues([["seat", "status", "updatedAt"]]);
+}
+
+function findSeatRow(sheet, seat) {
   const values = sheet.getDataRange().getDisplayValues();
   for (let r = 1; r < values.length; r++) {
-    if (values[r][0] === type && values[r][1] === key) return r + 1;
+    if (values[r][0] === seat) return r + 1;
+    if (values[r][0] === "student" && values[r][1] === seat) return r + 1;
   }
   return 0;
+}
+
+function removeDuplicateSeatRows(sheet, seat, keepRow) {
+  const values = sheet.getDataRange().getDisplayValues();
+  for (let r = values.length - 1; r >= 1; r--) {
+    const row = r + 1;
+    const currentSeat = values[r][0] === "student" ? values[r][1] : values[r][0];
+    if (row !== keepRow && currentSeat === seat) sheet.deleteRow(row);
+  }
 }
 
 function scanStudentsAndMissing() {
@@ -201,7 +228,8 @@ function isStudentSeat(value) {
 
 function normalizeManualStatus(value) {
   const status = String(value || "auto").trim();
-  if (status === "ok" || status === "calm" || status === "auto") return status;
+  if (status === "ok") return "free";
+  if (status === "free" || status === "calm" || status === "auto") return status;
   return "auto";
 }
 
