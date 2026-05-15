@@ -188,7 +188,7 @@ function scanStudentsAndMissing() {
       for (let c = FIRST_ASSIGNMENT_COLUMN - 1; c < backgrounds[r].length; c++) {
         const color = backgrounds[r][c];
         const title = titleForCell(headers, c, sheetName);
-        if (String(color || "").trim()) {
+        if (isDebuggableColor(color)) {
           debugColors.push({
             sheetName,
             row: r + 1,
@@ -252,6 +252,13 @@ function isStrictRed(r, g, b) {
 
 function isStrictYellow(r, g, b) {
   return r >= 170 && g >= 150 && b <= 130 && Math.abs(r - g) <= 85;
+}
+
+function isDebuggableColor(color) {
+  const value = String(color || "").trim().toLowerCase();
+  if (!value) return false;
+  if (value === "#ffffff" || value === "white" || value === "rgb(255, 255, 255)" || value === "rgba(255, 255, 255, 1)") return false;
+  return true;
 }
 
 function isRedCellColor(color) { return isRedLikeColor(color); }
