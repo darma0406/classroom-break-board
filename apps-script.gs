@@ -59,7 +59,8 @@ function getStatus() {
     action: "getStatus",
     updatedAt: new Date().toISOString(),
     classCalm,
-    students
+    students,
+    debugColors: scanned.debugColors
   };
 }
 
@@ -157,6 +158,7 @@ function removeDuplicateSeatRows(sheet, seat, keepRow) {
 function scanStudentsAndMissing() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const bySeat = {};
+  const debugColors = [];
 
   ss.getSheets().forEach(sheet => {
     const sheetName = sheet.getName();
@@ -186,6 +188,15 @@ function scanStudentsAndMissing() {
       for (let c = FIRST_ASSIGNMENT_COLUMN - 1; c < backgrounds[r].length; c++) {
         const color = backgrounds[r][c];
         const title = titleForCell(headers, c, sheetName);
+        if (String(color || "").trim()) {
+          debugColors.push({
+            sheetName,
+            row: r + 1,
+            column: c + 1,
+            title,
+            color
+          });
+        }
         if (isRedLikeColor(color)) bySeat[seat].missingAssignments.push(title);
         else if (isYellowLikeColor(color)) bySeat[seat].missingCorrections.push(title);
       }
@@ -201,7 +212,7 @@ function scanStudentsAndMissing() {
       missingCorrections: [...new Set(student.missingCorrections)]
     }));
 
-  return { students };
+  return { students, debugColors };
 }
 
 function titleForCell(headers, col, sheetName) {
