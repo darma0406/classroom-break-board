@@ -1,10 +1,11 @@
-const STATUS_SHEET_NAME = "_下課狀態";
+﻿const STATUS_SHEET_NAME = "_break_board_status";
 const SEAT_COLUMN = 1;
 const NAME_COLUMN = 2;
 const HEADER_ROW = 1;
 const FIRST_STUDENT_ROW = 2;
 const FIRST_ASSIGNMENT_COLUMN = 3;
-const RED_COLORS = ["#ff0000", "#ea4335", "rgb(255, 0, 0)"];
+const RED_COLORS = ["#ff0000", "#f4cccc", "#ea9999", "#e06666", "#ea4335", "rgb(255, 0, 0)"];
+const YELLOW_COLORS = ["#ffff00", "#fff2cc", "#ffd966", "#ffe599", "rgb(255, 255, 0)"];
 
 function doGet(e) {
   const params = e && e.parameter ? e.parameter : {};
@@ -46,7 +47,9 @@ function getStatus() {
       seat: student.seat,
       name: student.name,
       manualStatus,
-      missing: student.missing,
+      missingAssignments: student.missingAssignments,
+      missingCorrections: student.missingCorrections,
+      missing: student.missingAssignments,
       calm: manualStatus === "calm"
     };
   });
@@ -175,13 +178,16 @@ function scanStudentsAndMissing() {
           seat,
           studentNumber: Number(seat),
           name: seat + "號 " + rawName,
-          missing: []
+          missingAssignments: [],
+          missingCorrections: []
         };
       }
 
       for (let c = FIRST_ASSIGNMENT_COLUMN - 1; c < backgrounds[r].length; c++) {
-        if (!isRedCellColor(backgrounds[r][c])) continue;
-        bySeat[seat].missing.push(titleForCell(headers, c, sheetName));
+        const color = backgrounds[r][c];
+        const title = titleForCell(headers, c, sheetName);
+        if (isRedLikeColor(color)) bySeat[seat].missingAssignments.push(title);
+        else if (isYellowLikeColor(color)) bySeat[seat].missingCorrections.push(title);
       }
     }
   });
@@ -191,7 +197,8 @@ function scanStudentsAndMissing() {
     .map(student => ({
       seat: student.seat,
       name: student.name,
-      missing: [...new Set(student.missing)]
+      missingAssignments: [...new Set(student.missingAssignments)],
+      missingCorrections: [...new Set(student.missingCorrections)]
     }));
 
   return { students };
@@ -199,28 +206,45 @@ function scanStudentsAndMissing() {
 
 function titleForCell(headers, col, sheetName) {
   const header = String(headers[col] || "").trim();
-  return sheetName + "：" + (header || "未命名作業");
+  return sheetName + "｜" + (header || "未命名作業");
 }
 
-function isRedCellColor(color) {
+function isRedLikeColor(color) {
   const value = String(color || "").trim().toLowerCase();
   if (RED_COLORS.includes(value)) return true;
-  const hex = value.match(/^#([0-9a-f]{6})$/);
-  if (hex) {
-    return isStrictRed(
-      parseInt(hex[1].slice(0, 2), 16),
-      parseInt(hex[1].slice(2, 4), 16),
-      parseInt(hex[1].slice(4, 6), 16)
-    );
-  }
-  const rgb = value.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-  if (rgb) return isStrictRed(Number(rgb[1]), Number(rgb[2]), Number(rgb[3]));
-  return false;
+  const rgb = parseColorToRgb(value);
+  if (!rgb) return false;
+  return isStrictRed(rgb.r, rgb.g, rgb.b);
+}
+
+function isYellowLikeColor(color) {
+  const value = String(color || "").trim().toLowerCase();
+  if (YELLOW_COLORS.includes(value)) return true;
+  const rgb = parseColorToRgb(value);
+  if (!rgb) return false;
+  return isStrictYellow(rgb.r, rgb.g, rgb.b);
+}
+
+function parseColorToRgb(value) {
+  const hex = String(value || "").match(/^#([0-9a-f]{6})$/i);
+  if (hex) return { r: parseInt(hex[1].slice(0,2),16), g: parseInt(hex[1].slice(2,4),16), b: parseInt(hex[1].slice(4,6),16) };
+  const rgb = String(value || "").match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+  if (rgb) return { r: Number(rgb[1]), g: Number(rgb[2]), b: Number(rgb[3]) };
+  return null;
 }
 
 function isStrictRed(r, g, b) {
-  return r >= 220 && g <= 85 && b <= 85 && r > g * 2.4 && r > b * 2.4;
+  if (r >= 220 && g <= 110 && b <= 110) return true;
+  if (r >= 180 && g <= 140 && b <= 140 && r - g >= 50 && r - b >= 50) return true;
+  return false;
 }
+
+function isStrictYellow(r, g, b) {
+  return r >= 170 && g >= 150 && b <= 130 && Math.abs(r - g) <= 85;
+}
+
+function isRedCellColor(color) { return isRedLikeColor(color); }
+function isYellowCellColor(color) { return isYellowLikeColor(color); }
 
 function isStudentSeat(value) {
   return /^\d+$/.test(String(value || "").trim());
@@ -246,3 +270,5 @@ function outputJson(data, callback) {
   }
   return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
 }
+
+
