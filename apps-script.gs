@@ -5,7 +5,7 @@ const HEADER_ROW = 1;
 const FIRST_STUDENT_ROW = 2;
 const FIRST_ASSIGNMENT_COLUMN = 3;
 const RED_COLORS = ["#ff0000", "#f4cccc", "#ea9999", "#e06666", "#ea4335", "rgb(255, 0, 0)"];
-const YELLOW_COLORS = ["#ffff00", "#fff2cc", "#ffd966", "#ffe599", "#fce8b2", "rgb(255, 255, 0)"];
+const YELLOW_COLORS = ["#ffff00"];
 
 function doGet(e) {
   const params = e && e.parameter ? e.parameter : {};
@@ -251,7 +251,7 @@ function isStrictRed(r, g, b) {
 }
 
 function isStrictYellow(r, g, b) {
-  return r >= 200 && g >= 180 && b <= 210 && r > b && g > b;
+  return r === 255 && g === 255 && b === 0;
 }
 
 function isDebuggableColor(color) {
