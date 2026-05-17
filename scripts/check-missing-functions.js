@@ -31,6 +31,7 @@ const GLOBALS = new Set([
   "clearInterval",
   "clearTimeout",
   "console",
+  "confirm",
   "document",
   "fetch",
   "firebase",
