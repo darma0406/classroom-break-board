@@ -5,7 +5,7 @@ const HEADER_ROW = 1;
 const FIRST_STUDENT_ROW = 2;
 const FIRST_ASSIGNMENT_COLUMN = 3;
 const RED_COLORS = ["#ff0000", "#f4cccc", "#ea9999", "#e06666", "#ea4335", "rgb(255, 0, 0)"];
-const YELLOW_COLORS = ["#ffff00"];
+const YELLOW_COLORS = ["#ff0000"];
 
 function doGet(e) {
   const params = e && e.parameter ? e.parameter : {};
@@ -197,8 +197,8 @@ function scanStudentsAndMissing() {
             color
           });
         }
-        if (isRedLikeColor(color)) bySeat[seat].missingAssignments.push(title);
-        else if (isYellowLikeColor(color)) bySeat[seat].missingCorrections.push(title);
+        if (isYellowLikeColor(color)) bySeat[seat].missingCorrections.push(title);
+        else if (isRedLikeColor(color)) bySeat[seat].missingAssignments.push(title);
       }
     }
   });
@@ -222,6 +222,7 @@ function titleForCell(headers, col, sheetName) {
 
 function isRedLikeColor(color) {
   const value = String(color || "").trim().toLowerCase();
+  if (isYellowLikeColor(value)) return false;
   if (RED_COLORS.includes(value)) return true;
   const rgb = parseColorToRgb(value);
   if (!rgb) return false;
@@ -230,10 +231,7 @@ function isRedLikeColor(color) {
 
 function isYellowLikeColor(color) {
   const value = String(color || "").trim().toLowerCase();
-  if (YELLOW_COLORS.includes(value)) return true;
-  const rgb = parseColorToRgb(value);
-  if (!rgb) return false;
-  return isStrictYellow(rgb.r, rgb.g, rgb.b);
+  return YELLOW_COLORS.includes(value);
 }
 
 function parseColorToRgb(value) {
