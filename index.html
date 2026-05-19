@@ -86,7 +86,7 @@ function dismissActiveCountdown(){els.countdownOverlay.hidden=true;activeCountdo
 function pruneDismissedCountdowns(){const today=new Date().toISOString().slice(0,10),kept={};Object.keys(state.countdown.dismissedRunIds||{}).forEach(key=>{if(key.startsWith(today))kept[key]=true});state.countdown.dismissedRunIds=kept}
 function startClock(){updateClock();if(!clockTimer)clockTimer=setInterval(updateClock,1000)}
 function updateClock(){const now=new Date();els.timeNow.textContent=now.toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit",hour12:false});els.dateNow.textContent=now.toLocaleDateString("zh-TW",{month:"long",day:"numeric",weekday:"long"});renderNotices();updateCountdown()}
-function currentPeriod(date){const minute=date.getHours()*60+date.getMinutes(),periods=(state.periods.length?state.periods:DEFAULT_PERIODS).slice().sort(sortPeriods);return periods.find(p=>minute>=toMinutes(p.startTime||p.start)&&minute<=toMinutes(p.endTime||p.end))||null}
+function currentPeriod(date){const minute=date.getHours()*60+date.getMinutes(),periods=(state.periods.length?state.periods:DEFAULT_PERIODS).slice().sort(sortPeriods),matches=[];for(const period of periods)if(minute>=toMinutes(period.startTime||period.start)&&minute<=toMinutes(period.endTime||period.end))matches.push(period);if(!matches.length)return null;const exactEnd=matches.find(period=>minute===toMinutes(period.endTime||period.end));return exactEnd||matches[matches.length-1]}
 function loadLocalCache(){try{return normalizeState(JSON.parse(localStorage.getItem(cacheKey())||"null"))}catch(_){return createDefaultState()}}
 function saveLocalCache(){try{localStorage.setItem(cacheKey(),JSON.stringify(state))}catch(_){}}
 function cacheKey(){return`breakBoard:${classId}:cache`}
