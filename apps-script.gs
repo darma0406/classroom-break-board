@@ -1,4 +1,5 @@
 ﻿const STATUS_SHEET_NAME = "_break_board_status";
+const CLASSROOM_OS_MIRROR_SHEET_NAME = "_ClassroomOS_BreakBoard";
 const SEAT_COLUMN = 1;
 const NAME_COLUMN = 2;
 const HEADER_ROW = 1;
@@ -38,7 +39,8 @@ function handleAction(action, params) {
 
 function getStatus() {
   const manual = readStatusStore();
-  const scanned = scanStudentsAndMissing();
+  const classroomOsMirror = readClassroomOsMirrorSheet();
+  const scanned = classroomOsMirror.students.length ? classroomOsMirror : scanStudentsAndMissing();
   const classCalm = manual.classCalm === true;
 
   const students = scanned.students.map(student => {
@@ -49,6 +51,9 @@ function getStatus() {
       manualStatus,
       missingAssignments: student.missingAssignments,
       missingCorrections: student.missingCorrections,
+      incompleteAssignments: student.incompleteAssignments || [],
+      canBreak: student.canBreak,
+      tabletBlocked: student.tabletBlocked === true,
       missing: student.missingAssignments,
       calm: manualStatus === "calm"
     };
@@ -58,6 +63,8 @@ function getStatus() {
     ok: true,
     action: "getStatus",
     updatedAt: new Date().toISOString(),
+    source: classroomOsMirror.students.length ? "classroomOSMirror" : "legacyColorScan",
+    classroomOSMirror: classroomOsMirror.students.length > 0,
     classCalm,
     students,
     debugColors: scanned.debugColors
@@ -213,6 +220,90 @@ function scanStudentsAndMissing() {
     }));
 
   return { students, debugColors };
+}
+
+function readClassroomOsMirrorSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CLASSROOM_OS_MIRROR_SHEET_NAME);
+  if (!sheet) return { students: [], debugColors: [] };
+
+  const range = sheet.getDataRange();
+  const values = range.getDisplayValues();
+  if (values.length < 2) return { students: [], debugColors: [] };
+
+  const headers = buildHeaderIndex(values[0]);
+  const seatIndex = findHeaderIndex(headers, ["座號", "seat", "seatNumber"]);
+  const nameIndex = findHeaderIndex(headers, ["姓名", "name"]);
+  const missingIndex = findHeaderIndex(headers, ["未交", "missing"]);
+  const revisionIndex = findHeaderIndex(headers, ["訂正", "revision", "needsRevision", "needs_correction"]);
+  const incompleteIndex = findHeaderIndex(headers, ["未完成", "incomplete", "pending"]);
+  const canBreakIndex = findHeaderIndex(headers, ["可下課", "canBreak"]);
+  const tabletBlockedIndex = findHeaderIndex(headers, ["禁用平板", "tabletBlocked"]);
+
+  if (seatIndex < 0 || nameIndex < 0) return { students: [], debugColors: [] };
+
+  const students = [];
+  for (let r = 1; r < values.length; r++) {
+    const row = values[r];
+    const seat = String(row[seatIndex] || "").trim();
+    const rawName = String(row[nameIndex] || "").trim();
+    if (!isStudentSeat(seat) || !rawName) continue;
+
+    const missingAssignments = splitMirrorList(missingIndex >= 0 ? row[missingIndex] : "");
+    const missingCorrections = splitMirrorList(revisionIndex >= 0 ? row[revisionIndex] : "");
+    const incompleteAssignments = splitMirrorList(incompleteIndex >= 0 ? row[incompleteIndex] : "");
+    const canBreak = parseSheetBoolean(canBreakIndex >= 0 ? row[canBreakIndex] : "", true);
+    const tabletBlocked = parseSheetBoolean(tabletBlockedIndex >= 0 ? row[tabletBlockedIndex] : "", false);
+
+    students.push({
+      seat,
+      studentNumber: Number(seat),
+      name: seat + "號 " + rawName.replace(/^\d+\s*號\s*/, ""),
+      missingAssignments,
+      missingCorrections,
+      incompleteAssignments,
+      canBreak,
+      tabletBlocked
+    });
+  }
+
+  students.sort((a, b) => a.studentNumber - b.studentNumber);
+  return { students, debugColors: [] };
+}
+
+function buildHeaderIndex(headerRow) {
+  const map = {};
+  headerRow.forEach((header, index) => {
+    const key = normalizeHeaderName(header);
+    if (key) map[key] = index;
+  });
+  return map;
+}
+
+function findHeaderIndex(headers, names) {
+  for (let i = 0; i < names.length; i++) {
+    const key = normalizeHeaderName(names[i]);
+    if (Object.prototype.hasOwnProperty.call(headers, key)) return headers[key];
+  }
+  return -1;
+}
+
+function normalizeHeaderName(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function splitMirrorList(value) {
+  return String(value || "")
+    .split(/\r?\n|[、，,]/)
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function parseSheetBoolean(value, fallback) {
+  const text = String(value || "").trim().toLowerCase();
+  if (value === true || text === "true" || text === "是" || text === "1" || text === "yes" || text === "y") return true;
+  if (value === false || text === "false" || text === "否" || text === "0" || text === "no" || text === "n") return false;
+  return fallback;
 }
 
 function titleForCell(headers, col, sheetName) {
