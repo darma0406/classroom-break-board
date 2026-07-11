@@ -1,94 +1,124 @@
 # 下課狀態看板
 
-這是國小教室下課時間用的全螢幕看板。資料可從 Google 試算表同步，學生手動狀態與「全班冷靜」也會寫回 Google Sheet，讓多台電腦或平板即時同步。
+這個專案是舊版 GitHub Pages 下課狀態看板。它保留原本的 Google Sheet 顏色掃描 fallback，同時可優先讀取 Classroom OS 寫入的 `_ClassroomOS_BreakBoard` mirror sheet。
 
-## 開啟方式
-
-不要直接雙擊 `index.html`。請使用其中一種方式：
+## 本機啟動
 
 ```bash
 npm start
 ```
 
-然後開啟：
+開啟：
 
 ```text
 http://localhost:4173
 ```
 
-也可以用 VSCode Live Server 或 GitHub Pages 開啟。
+也可以使用 GitHub Pages 正式網址。
 
-## Google Sheet 格式
+## Classroom OS Mirror Read 架構
 
-每個作業頁籤都使用同一格式：
+正式資料流：
 
-- A 欄：座號，必須是數字
-- B 欄：姓名，必須有內容
-- C 欄之後：作業繳交狀況
-- 第 1 列：作業名稱
-- 第 2 列開始：學生資料
+```text
+Classroom OS
+-> Apps Script doPost
+-> Google Sheet _ClassroomOS_BreakBoard
+-> Apps Script doGet/getStatus
+-> GitHub Pages index.html fetch
+-> data normalization
+-> student card render
+```
 
-只有 A 欄是數字座號且 B 欄有姓名的列會被當成學生。空白列、標題列、說明文字會被跳過。
+`_ClassroomOS_BreakBoard` 使用下列表頭：
 
-## 紅色格子
+- 座號
+- 姓名
+- 未交
+- 訂正
+- 未完成
+- 可下課
+- 禁用平板
+- 同步時間
 
-學生列中 C 欄之後只要有紅色格子，就會顯示為「下課冷靜」，並在「作業」按鈕中列出該欄第 1 列的作業名稱。
+讀取端會依表頭名稱找欄位，不依賴固定欄位位置。
 
-支援的紅色包含：
+## Apps Script 檔案
 
-- `#ff0000`
-- `#ea4335`
-- `rgb(255, 0, 0)`
-- 其他接近純紅、但不包含粉紅與橘色的紅色
+本 repo 提供兩份 Apps Script 來源：
 
-## 即時同步
+- `apps-script.gs`: 舊版 board API 參考檔。
+- `apps-script-classroom-os-mirror-merged.gs`: 可貼入 Google Apps Script 的整合版 board 讀取程式。
 
-前端每 3 秒會向 Apps Script 讀取一次狀態。
+整合版重點：
 
-會同步的內容：
+- `getStatus()` 優先讀 `_ClassroomOS_BreakBoard`。
+- mirror 有有效學生資料時，回傳 `source: "ClassroomOSMirror"` 與 `classroomOSMirror: true`。
+- mirror 不存在或無有效學生資料時，fallback 到 legacy color scan。
+- 保留 `manualStatus`、`classCalm`、`updateStatus()`、`updateAllStatus()`。
+- 不宣告 top-level `doPost(e)`，避免破壞 Classroom OS 寫入 sync。
 
-- 可以下課
-- 下課冷靜
-- 手動切換狀態
-- 全班冷靜模式
-- 未交作業清單
+## Google Apps Script 部署步驟
 
-localStorage 只做快取，不是主要資料來源。
+目前 Google Apps Script 專案若同時包含 `board.gs` 與 `webapp.gs.gs`，請照以下方式處理：
 
-## Apps Script 部署
+1. 開啟 Google Apps Script 專案。
+2. 將 `apps-script-classroom-os-mirror-merged.gs` 的內容貼到 `board.gs`，覆蓋原本 `board.gs`。
+3. 保留 `break-board-sync.gs`。
+4. 保留 `webapp.gs.gs` 裡已成功運作的 Classroom OS 寫入 `doPost(e)`。
+5. 確認 Apps Script 專案中只有一個正式 top-level `doPost(e)`。
+6. 建立新部署版本，建議使用下一個版本號，例如 Version 6。
+7. Web App URL 可維持原本 `/exec` URL。
 
-1. 打開 Google 試算表。
-2. 選「擴充功能」→「Apps Script」。
-3. 貼上本專案的 `apps-script.gs`。
-4. 部署成「網頁應用程式」。
-5. 執行身分選「我」。
-6. 存取權限選「知道連結的任何人」。
-7. 複製網頁應用程式網址。
-8. 在看板右上角齒輪設定中貼到「Apps Script 網頁應用程式網址」。
+如果仍需要舊版 POST action，請不要在 `board.gs` 新增第二個 top-level `doPost(e)`。應由唯一的 top-level `doPost(e)` 做 payload routing，或呼叫整合檔中的 `legacyBoardDoPostHandler(e)`。
 
-Apps Script 會自動建立一個隱藏頁籤 `_下課狀態`，用來保存手動狀態與全班冷靜狀態。
+## 測試方式
 
-## Apps Script API
+先在 Apps Script 編輯器執行：
 
-目前支援：
+```javascript
+testClassroomOsMirrorRead()
+```
 
-- `getStatus`：讀取學生、未交作業、手動狀態、全班冷靜狀態
-- `updateStatus`：更新單一學生狀態
-- `updateAllStatus`：更新全班冷靜模式
+預期回傳：
 
-## 多台同步測試
+- `students` 有資料
+- `updatedAt` 來自 `_ClassroomOS_BreakBoard` 的同步時間
+- 若缺少 `座號` 或 `姓名` 表頭，會 throw error
 
-1. 在 A 電腦與 B 電腦都開啟同一個看板網址。
-2. 兩台都設定同一個 Apps Script 網址。
-3. A 電腦點某位學生的狀態。
-4. B 電腦等待 3 秒左右，應自動更新。
-5. A 電腦點「全班冷靜」。
-6. B 電腦等待 3 秒左右，應出現大型「全班冷靜」提示。
-7. 再按「取消冷靜」，所有裝置會回到原本狀態。
+部署後測試：
 
-## 常見問題
+```text
+https://script.google.com/macros/s/AKfycby5h0QWJ5TSAR7IVE1s7QrgYoNAKbRiIu6HmJXdyPofyaF55rHvuXIpxhC8S7jRl76rfg/exec?action=getStatus
+```
 
-- 如果用 `file://` 開啟，同步可能失敗，請改用 localhost、Live Server 或 GitHub Pages。
-- 如果同步失敗，請確認 Apps Script 是「網頁應用程式」網址，不是編輯器網址。
-- 如果 B 電腦沒更新，請確認兩台用的是同一個 Apps Script 部署網址。
-- 修改 `apps-script.gs` 後一定要重新部署，前端才會連到新版 API。
+正確 JSON 必須包含：
+
+```json
+{
+  "source": "ClassroomOSMirror",
+  "classroomOSMirror": true
+}
+```
+
+再測試正式看板：
+
+```text
+https://darma0406.github.io/classroom-break-board/?class=rpes114503&v=classroom-os-mirror-final
+```
+
+開啟後按「更新名單」。
+
+## Legacy Fallback
+
+若 `_ClassroomOS_BreakBoard` 不存在或沒有有效學生資料，`getStatus()` 會 fallback 到原本的 Google Sheet 顏色掃描：
+
+- 紅色作業格 -> `missingAssignments`
+- 黃色作業格 -> `missingCorrections`
+- `incompleteAssignments` 補空陣列
+- `canBreak` 補 `true`
+- `tabletBlocked` 補 `false`
+- `source` 回傳 `LegacyColorScan`
+- `classroomOSMirror` 回傳 `false`
+
+這個 fallback 用來保護舊版正式看板，不應移除。
